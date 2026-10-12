@@ -1,0 +1,22 @@
+services:
+  bybuy:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:2254:2254"
+    environment:
+      PORT: "2254"
+      HOST: "0.0.0.0"
+      PUBLIC_ORIGIN: "https://buy.bingyun.vip"
+      UPSTREAM_ORIGIN: "${UPSTREAM_ORIGIN:?UPSTREAM_ORIGIN must be set in .env}"
+      UPSTREAM_TIMEOUT_MS: "${UPSTREAM_TIMEOUT_MS:-25000}"
+      SERVICE_DIAGNOSTICS: "${SERVICE_DIAGNOSTICS:-0}"
+      # Published only on loopback. Adapt for a custom Docker bridge subnet.
+      TRUST_PROXY: "${TRUST_PROXY:-loopback,172.16.0.0/12}"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true

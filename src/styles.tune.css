@@ -1,0 +1,320 @@
+/* ==========================================================================
+   ByBuy — 微调层（styles.tune.css）
+   由 App.tsx 引入，排在 styles.slim.css / styles.motion.css / styles.order.css
+   之后、styles.css 之前。
+
+   凡是覆盖基础样式表里已有选择器的地方，都把权重提到 (0,2,0) 以上 ——
+   因为 styles.css 在打包结果里排在最后。
+   ========================================================================== */
+
+/* ------------------------------------------------ 顶部「系统状态」指示灯 */
+
+.service-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 11px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* 基础表里有 `.header-settings svg { width:17px }`，所以圆点用 span 而不是 svg，
+   再靠提权把尺寸钉死。 */
+.header-settings .service-status .status-dot {
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+/* 正常时的「呼吸」：圆点的光晕缓慢收放，胶囊外圈跟着一起明暗。
+   周期都是 2.6s、同步起步，看上去是同一个脉动，而不是两个各动各的。
+   只动 box-shadow —— 这两个元素都只有几像素到三十像素高，
+   重绘代价可以忽略，也不会触发重排。 */
+.service-status--online { border-color: var(--ok-border); background: var(--ok-bg); color: var(--ok); }
+.header-settings .service-status--online .status-dot {
+  background: var(--ok);
+  animation: bb-status-breathe 2.6s ease-in-out infinite;
+}
+@keyframes bb-status-breathe {
+  0%, 100% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 24%, transparent); }
+  50%      { box-shadow: 0 0 0 6px color-mix(in srgb, var(--ok) 6%, transparent); }
+}
+
+.header-settings .service-status--online { animation: bb-status-glow 2.6s ease-in-out infinite; }
+@keyframes bb-status-glow {
+  0%, 100% { box-shadow: 0 0 0 0 transparent; }
+  50%      { box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 10%, transparent); }
+}
+
+/* 异常时不呼吸 —— 红色本身已经够扎眼，再加动效就成了骚扰。
+   只把光晕固定住，保持"亮着"的状态。 */
+.service-status--offline {
+  border-color: color-mix(in srgb, var(--danger) 28%, transparent);
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+.header-settings .service-status--offline .status-dot {
+  background: var(--danger);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 20%, transparent);
+}
+
+/* 还在检测（首次进入的 1～2 秒）时圆点闪烁一下，避免看着像"坏了" */
+.service-status--checking .status-dot { animation: bb-blink 1.2s ease-in-out infinite; }
+@keyframes bb-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+
+/* ============================================ hero 关键词胶囊：随机放大一个 */
+
+/* App.tsx 每次挂载随机挑一个加上 .hero-chip--featured。
+   用「加大内边距 + 加大字号」来放大，而不是 transform: scale() ——
+   胶囊身上已经有 bb-pop 在动 transform，再叠一层会互相盖掉；
+   而且改内边距不会把相邻胶囊压住。 */
+.hero-slim .hero-chips li.hero-chip--featured {
+  position: relative;
+  padding: 9px 17px 9px 13px;
+  border-color: color-mix(in srgb, var(--brand) 34%, transparent);
+  background: var(--brand-soft);
+  color: var(--brand-strong);
+  font-size: var(--fs-body);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+.hero-slim .hero-chips li.hero-chip--featured svg { width: 17px; height: 17px; }
+
+/* 呼吸光环。挂在 ::after 上，和胶囊自己的 bb-pop 各动各的，互不干扰。 */
+.hero-slim .hero-chips li.hero-chip--featured::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border: 1.5px solid color-mix(in srgb, var(--brand) 40%, transparent);
+  border-radius: inherit;
+  pointer-events: none;
+  animation: bb-chip-breathe 2.6s ease-in-out infinite;
+}
+@keyframes bb-chip-breathe {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50%      { opacity: 0.9; transform: scale(1.05); }
+}
+
+/* 放大 + 光环会比别的胶囊往外多出几个像素，把间距撑开一点，
+   免得光环贴到邻居身上。 */
+.hero-slim .hero-chips { gap: 10px 14px; }
+
+/* ------------------------------------------------- 充值页：引导条一行显示 */
+
+/* 原来把 <p> 撑成 flex-basis:100%，所以永远占两行 —— 这是"两行"的根源。
+   去掉之后四个元素（两个链接 + 分隔线 + 说明）排在同一行；
+   窄屏放不下时容器自己换行，不会横向溢出。
+   字号从 --fs-small（13px）提到 --fs-body（15px）。 */
+.task-section .session-guide {
+  justify-content: center;
+  gap: 10px 18px;
+  padding: 14px 20px;
+  font-size: var(--fs-body);
+}
+.task-section .session-guide p {
+  flex-basis: auto;
+  text-align: center;
+}
+/* 序号圆圈跟着字号一起放大，否则会显得头重脚轻 */
+.task-section .session-guide a > span {
+  width: 22px;
+  height: 22px;
+  font-size: 12px;
+}
+
+/* ========================================== 注意事项（引导条与充值卡之间） */
+
+/* 11 条全平铺下来没人读得下去，所以分成三组、各一个颜色。
+   桌面端三组并排 —— 整块只占"一张卡"的高度，不会把充值卡顶到屏幕外。
+   颜色直接用 styles.css 里已有的 --warn / --danger / --ok 令牌，
+   深色模式自动跟着变，不用另写一套。 */
+.notice-board {
+  margin-bottom: 18px;
+  padding: 18px 20px 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-xs);
+}
+
+.notice-board-head {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin-bottom: 14px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.notice-board--collapsed .notice-board-head { margin-bottom: 0; }
+.notice-board-head > svg { flex-shrink: 0; width: 16px; height: 16px; color: var(--brand-strong); }
+.notice-board-head > .notice-toggle-icon {
+  grid-column: 4;
+  margin-left: 4px;
+  transition: transform 0.18s ease;
+}
+.notice-board-head[aria-expanded='true'] > .notice-toggle-icon { transform: rotate(180deg); }
+.notice-board-head h2 { font-size: var(--fs-h3); font-weight: 650; letter-spacing: -0.01em; }
+.notice-board-head p { margin-left: auto; color: var(--muted); font-size: var(--fs-small); }
+
+.notice-groups {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.notice-group {
+  padding: 12px 14px 14px;
+  border: 1px solid var(--tone-border);
+  border-radius: var(--radius);
+  background: var(--tone-bg);
+}
+.notice-group--warn { --tone-fg: var(--warn); --tone-bg: var(--warn-bg); --tone-border: var(--warn-border); }
+.notice-group--danger { --tone-fg: var(--danger); --tone-bg: var(--danger-bg); --tone-border: color-mix(in srgb, var(--danger) 28%, transparent); }
+.notice-group--safe { --tone-fg: var(--ok); --tone-bg: var(--ok-bg); --tone-border: var(--ok-border); }
+
+.notice-group-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 9px;
+  color: var(--tone-fg);
+  font-size: var(--fs-small);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.notice-group-title svg { flex-shrink: 0; width: 14px; height: 14px; }
+
+.notice-group ul { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.notice-group li {
+  position: relative;
+  padding-left: 12px;
+  color: var(--text-2);
+  font-size: var(--fs-cap);
+  line-height: 1.62;
+}
+/* 小圆点用伪元素，比 list-style 好对齐（换行后第二行不会跑到圆点下面） */
+.notice-group li::before {
+  content: '';
+  position: absolute;
+  top: 7px;
+  left: 0;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--tone-fg);
+  opacity: 0.55;
+}
+.notice-group strong { color: var(--text); font-weight: 650; }
+
+/* --------------------------------------------------- 步骤条：内容居中 */
+
+/* 只改桌面端：手机上基础表把按钮改成了纵向布局，
+   连接线的位置另有设定，这里不能盖掉。 */
+@media (min-width: 641px) {
+  .flow-card > .steps button { justify-content: center; }
+  /* 内容居中后，连接线要挪到两列的分界线上，不然会贴在左边 */
+  .flow-card > .steps li:not(:last-child)::after { right: -10px; width: 20px; }
+}
+
+/* ------------------------------------------------- 订单页：整页居中 */
+
+.page-shell .page-intro { margin-inline: auto; text-align: center; }
+.page-shell .order-card { margin-inline: auto; }
+
+/* ============================================================ 服务异常 */
+
+/* 说明条。默认是「独立一块」的样式（圆角 + 外边距），
+   放进 flow-card 里时改成通栏贴边。 */
+.service-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding: 16px 18px;
+  border: 1px solid color-mix(in srgb, var(--danger) 26%, transparent);
+  border-radius: var(--radius);
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+.service-notice > svg { flex-shrink: 0; width: 18px; height: 18px; margin-top: 1px; }
+.service-notice-text { min-width: 0; flex: 1; }
+.service-notice-text strong { display: block; font-size: 14px; font-weight: 650; }
+.service-notice-text p { margin-top: 4px; font-size: var(--fs-small); line-height: 1.6; opacity: 0.92; }
+/* 基础表里的 .text-button 是品牌蓝，在红色底上不搭 */
+.service-notice .text-button { flex-shrink: 0; margin-left: auto; color: inherit; font-weight: 600; }
+.service-notice .text-button:hover { background: color-mix(in srgb, var(--danger) 12%, transparent); }
+
+/* 在 flow-card 里通栏贴顶（flow-card 自己 overflow: hidden，圆角不用管） */
+.flow-card > .service-notice {
+  margin-bottom: 0;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--danger) 26%, transparent);
+  border-radius: 0;
+}
+
+/* 订单页的说明条要和 720px 的卡片对齐 */
+.page-shell > .service-notice { max-width: 720px; margin-inline: auto; }
+
+/* 服务异常时：卡片内容整体变灰、不可点、不可 Tab 进去。
+   `inert` 属性负责真正的禁用和无障碍树，这里只是视觉上的"停用"。
+   两处都做 —— 老浏览器不支持 inert 时，pointer-events 至少能挡住鼠标。 */
+.flow-card--locked { border-color: color-mix(in srgb, var(--danger) 22%, transparent); }
+.flow-card--locked .steps,
+.flow-card--locked .flow-body { opacity: 0.4; pointer-events: none; user-select: none; }
+
+@media (max-width: 640px) {
+  .service-notice { flex-wrap: wrap; gap: 10px; padding: 14px; }
+  .service-notice .text-button { margin-left: 0; }
+}
+
+/* ------------------------------------------------------------ 响应式 */
+
+@media (max-width: 900px) {
+  .service-status { font-size: 11px; padding: 0 9px; }
+
+  /* 注意事项：三列并排放不下，改成纵向堆叠。
+     副标题也从"靠右"改成"换行占满"，否则会和标题挤在一起。 */
+  .notice-groups { grid-template-columns: 1fr; gap: 10px; }
+  .notice-board { padding: 16px 16px 18px; }
+  .notice-board-head { grid-template-columns: auto minmax(0, 1fr) auto; row-gap: 4px; }
+  .notice-board-head h2 { grid-column: 2; }
+  .notice-board-head p { grid-column: 1 / 3; grid-row: 2; margin-left: 0; }
+  .notice-board-head > .notice-toggle-icon { grid-column: 3; grid-row: 2; align-self: center; }
+}
+
+/* 窄屏上顶部一行放不下「系统状态：正常」这么长的字，
+   只留圆点 + 状态词，把前缀收起来（完整文案仍在 title 里）。 */
+@media (max-width: 640px) {
+  .service-status { gap: 5px; padding: 0 8px; font-size: 11px; }
+  .service-status .status-prefix { display: none; }
+  /* 引导条：字号保持放大后的 15px（用户就是嫌小），只把留白收紧一点 */
+  .task-section .session-guide { gap: 8px 12px; padding: 12px 14px; }
+  .task-section .session-guide a > span { width: 20px; height: 20px; font-size: 11px; }
+  /* 窄屏上说明文字比桌面端更小一号，条目多，得省点空间 */
+  .notice-group li { font-size: var(--fs-small); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .service-status--checking .status-dot,
+  .header-settings .service-status--online .status-dot,
+  .header-settings .service-status--online,
+  .hero-slim .hero-chips li.hero-chip--featured::after { animation: none !important; }
+  /* 关掉动效后，光环的"亮着"状态得补回来，否则放大后的胶囊会显得没描边 */
+  .hero-slim .hero-chips li.hero-chip--featured::after { opacity: 0.6; }
+}

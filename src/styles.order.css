@@ -1,0 +1,261 @@
+/* ==========================================================================
+   ByBuy — 订单查询页 & 卡密提示（styles.order.css）
+   由 App.tsx 引入，排在 styles.slim.css / styles.motion.css 之后、styles.css 之前。
+
+   这里全是新类名，唯一需要「覆盖」的是：
+     · .card-reminder--strong  —— 基础表里的 .card-reminder 是灰字，太不显眼
+     · .order-result .order-headline h2 —— 基础表里 .order-result h2 会改掉字号和间距
+   两处都靠提权解决。
+   ========================================================================== */
+
+@keyframes bb-draw-y { from { transform: scaleY(0); } }
+
+/* --------------------------------------------------- 卡密即凭证（强化） */
+
+/* 原来只是居中一行灰字，等于没提示。改成琥珀色胶囊条：
+   有底色、有描边、加粗，一眼能看见，又不至于像报错。 */
+.card-reminder.card-reminder--strong {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: fit-content;
+  max-width: 100%;
+  margin: 24px auto 0;
+  padding: 12px 22px;
+  border: 1px solid var(--warn-border);
+  border-radius: 999px;
+  background: var(--warn-bg);
+  color: var(--warn);
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.4;
+  letter-spacing: 0.01em;
+  text-align: center;
+  box-shadow: var(--shadow-xs);
+}
+.card-reminder.card-reminder--strong svg { flex-shrink: 0; width: 16px; height: 16px; }
+
+/* ------------------------------------------------------ 结果标题卡 */
+
+.order-result .order-headline {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+.order-result .order-headline > div { min-width: 0; }
+
+/* 基础表的 .order-result h2 会把它变成 flex + 18px 下边距，这里提权压回去 */
+.order-result .order-headline h2 {
+  display: block;
+  margin-bottom: 0;
+  font-size: 19px;
+  font-weight: 680;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+}
+.order-result .order-headline p {
+  margin-top: 5px;
+  color: var(--text-2);
+  font-size: var(--fs-small);
+}
+.order-result .order-headline strong { font-weight: 650; }
+
+.order-mark {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 46px;
+  height: 46px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text-2);
+}
+.order-mark svg { width: 22px; height: 22px; }
+
+/* 四套语义配色：绿=完成 / 蓝=进行中 / 灰=未知 / 红=未完成 */
+.order-result--ok .order-headline { border-color: var(--ok-border); background: var(--ok-bg); }
+.order-result--ok .order-mark { border-color: var(--ok-border); background: var(--surface); color: var(--ok); }
+.order-result--ok .order-headline h2 { color: var(--ok); }
+
+.order-result--progress .order-headline {
+  border-color: color-mix(in srgb, var(--brand) 22%, transparent);
+  background: var(--brand-soft);
+}
+.order-result--progress .order-mark { border-color: transparent; background: var(--surface); color: var(--brand-strong); animation: bb-breathe 2.6s ease-in-out infinite; }
+.order-result--progress .order-headline h2 { color: var(--brand-strong); }
+
+.order-result--muted .order-headline { border-color: var(--border); background: var(--surface-3); }
+.order-result--muted .order-mark { border-color: var(--border); background: var(--surface); color: var(--muted); }
+.order-result--muted .order-headline h2 { color: var(--text-2); }
+
+.order-result--bad .order-headline { border-color: color-mix(in srgb, var(--danger) 24%, transparent); background: var(--danger-bg); }
+.order-result--bad .order-mark { border-color: transparent; background: var(--surface); color: var(--danger); }
+.order-result--bad .order-headline h2 { color: var(--danger); }
+
+/* ------------------------------------------------------------ 事实清单 */
+
+.order-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px 20px;
+  margin: 16px 0 0;
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+.order-facts > div { min-width: 0; }
+.order-facts dt { color: var(--muted); font-size: var(--fs-small); }
+.order-facts dd {
+  margin-top: 5px;
+  font-size: 15px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+
+/* -------------------------------------------------------------- 时间轴 */
+
+/* 节点色统一走 --tl-accent，按结果语义换一次就行 */
+.order-timeline {
+  --tl-accent: var(--brand);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 22px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.order-result--ok .order-timeline { --tl-accent: var(--ok); }
+.order-result--bad .order-timeline { --tl-accent: var(--danger); }
+.order-result--muted .order-timeline { --tl-accent: var(--muted); }
+
+.order-timeline li {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 7px;
+  text-align: center;
+}
+
+/* 横向连接线：从上个节点的圆心拉到当前节点的圆心 */
+.order-timeline li:not(:first-child)::before {
+  content: '';
+  position: absolute;
+  top: 12px;
+  left: -50%;
+  right: 50%;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--border-2);
+  transform-origin: left center;
+}
+.order-timeline li.done::before,
+.order-timeline li.current::before {
+  background: var(--tl-accent);
+  animation: bb-draw 480ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.order-timeline .tl-dot {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--border-2);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--muted);
+  animation: bb-pop 400ms cubic-bezier(0.34, 1.42, 0.64, 1) both;
+}
+.order-timeline .tl-dot svg { width: 12px; height: 12px; }
+
+.order-timeline .tl-label {
+  color: var(--muted);
+  font-size: var(--fs-small);
+  font-weight: 550;
+  line-height: 1.35;
+}
+.order-timeline .tl-time {
+  color: var(--muted);
+  font-size: var(--fs-cap);
+  font-variant-numeric: tabular-nums;
+}
+
+.order-timeline li.done .tl-dot,
+.order-timeline li.current .tl-dot { border-color: transparent; background: var(--tl-accent); color: #fff; }
+.order-timeline li.current .tl-dot { box-shadow: 0 0 0 4px color-mix(in srgb, var(--tl-accent) 16%, transparent); }
+.order-timeline li.done .tl-label,
+.order-timeline li.current .tl-label { color: var(--text); font-weight: 600; }
+.order-timeline li.done .tl-time,
+.order-timeline li.current .tl-time { color: var(--text-2); }
+
+/* 逐节点错开入场，让进度「一格格亮起来」 */
+.order-timeline li:nth-child(2)::before { animation-delay: 90ms; }
+.order-timeline li:nth-child(3)::before { animation-delay: 190ms; }
+.order-timeline li:nth-child(2) .tl-dot { animation-delay: 110ms; }
+.order-timeline li:nth-child(3) .tl-dot { animation-delay: 220ms; }
+
+.order-date-note {
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: var(--fs-cap);
+  text-align: center;
+}
+
+/* ------------------------------------------------------------ 响应式 */
+
+@media (max-width: 640px) {
+  .card-reminder.card-reminder--strong {
+    width: 100%;
+    margin-top: 18px;
+    padding: 11px 14px;
+    border-radius: var(--radius);
+    text-align: left;
+  }
+
+  .order-facts { grid-template-columns: minmax(0, 1fr); gap: 14px; padding: 16px; }
+
+  /* 手机上时间戳放不下一行，时间轴改纵向：
+     圆点在左，节点名 / 时间在右，连接线从上往下长出来 */
+  .order-timeline { grid-template-columns: minmax(0, 1fr); }
+  .order-timeline li {
+    grid-template-columns: 24px minmax(0, 1fr);
+    column-gap: 12px;
+    row-gap: 3px;
+    justify-items: start;
+    align-items: start;
+    padding-bottom: 18px;
+    text-align: left;
+  }
+  .order-timeline li:last-child { padding-bottom: 0; }
+  .order-timeline li:not(:first-child)::before { content: none; }
+  /* 自动排布会把第 3 个子元素（时间）塞回第 1 列，也就是圆点那一列，
+     结果时间被挤成两行。显式钉到第 2 列。 */
+  .order-timeline .tl-label,
+  .order-timeline .tl-time { grid-column: 2; }
+  .order-timeline .tl-time { white-space: nowrap; }
+  .order-timeline li:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 26px;
+    bottom: 0;
+    width: 2px;
+    border-radius: 2px;
+    background: var(--border-2);
+    transform-origin: top center;
+  }
+  .order-timeline li.done::after,
+  .order-timeline li.current::after {
+    background: var(--tl-accent);
+    animation: bb-draw-y 480ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .order-timeline li:nth-child(2)::after { animation-delay: 90ms; }
+  .order-timeline li:nth-child(3)::after { animation-delay: 190ms; }
+  .order-timeline li:nth-child(n) .tl-dot { animation-delay: 0ms; }
+}

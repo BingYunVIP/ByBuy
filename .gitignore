@@ -1,0 +1,17 @@
+node_modules/
+.venv/
+__pycache__/
+dist/
+.env
+.env.*
+!.env.example
+artifacts/
+*.log
+.DS_Store
+auth.json
+session.json
+*.auth.json
+.private/
+.runtime/
+logs/
+run/
