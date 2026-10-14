@@ -1,8 +1,8 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import {
-  BadgeCheck, BadgeDollarSign, Ban, BookOpenText, Check, ChevronDown, CircleCheck, CircleX, Clock3, CreditCard, HandCoins, Info,
+  BadgeCheck, BadgeDollarSign, Ban, Check, ChevronDown, CircleCheck, CircleX, Clock3, CreditCard, HandCoins, Headphones, Info,
   Languages, LoaderCircle, LockKeyhole, MapPin, Moon, Repeat2, RotateCcw, Search, ShieldCheck, Sun,
-  TriangleAlert, UsersRound,
+  TriangleAlert,
 } from 'lucide-react';
 import CardField from './CardField';
 import { completeStripeVerification, requestCard } from './api';
@@ -18,12 +18,23 @@ import './styles.tune.css';
 const Recharge = lazy(() => import('./SubscriptionCheck'));
 const ORDER_POLL_MS = 5_000;
 
+/* 顶部导航的外链。SHOP 是卡密购买入口，与冰云首页「冰云商店」指向同一站点。 */
 const SUPPORT = 'https://qm.qq.com/q/6fuAq8mBwW';
-const DOCS = 'https://docs.bingyun.vip/zh/posts/shop/chatgpt/';
+const SHOP = 'https://shop.bingyun.vip';
+const EMAIL = 'support@bingyun.vip';
 /* 外链直接指向 ChatGPT 这个 App 的全球价格对比页，而不是站点首页。
    App Store ID 6448311069 = ChatGPT。 */
 const PRICES = 'https://appstoreprice.org/zh/apps/6448311069';
 const BYAI = 'https://api.bingyun.vip';
+
+/* 顶部导航（订单查询是站内路由，单独渲染，所以不在这份表里）。 */
+const navLinks = [
+  { key: 'prices', href: PRICES, icon: 'appstore', external: true },
+  { key: 'ai', href: BYAI, icon: 'openai', external: true },
+  { key: 'store', href: SHOP, icon: 'bag', external: true },
+  { key: 'support', href: SUPPORT, icon: 'users', external: true },
+  { key: 'email', href: `mailto:${EMAIL}`, icon: 'mail', external: false },
+] as const;
 
 /* Hero 关键词胶囊：保持统一尺寸与现有动效，补充套餐、保障和地区信息。 */
 const heroChips = [
@@ -32,12 +43,13 @@ const heroChips = [
   [HandCoins, '只收人工费', 'Service fee only'],
   [LockKeyhole, '数据加密传输', 'Encrypted transfer'],
   [RotateCcw, '失败可退', 'Refund on failure'],
-  [BadgeDollarSign, 'Plus 125r', 'Plus 125r'],
-  [BadgeDollarSign, 'Pro 5x 700r', 'Pro 5x 700r'],
-  [BadgeDollarSign, 'Pro 20x 1100r', 'Pro 20x 1100r'],
-  [BadgeDollarSign, 'Pro 25x 3200r', 'Pro 25x 3200r'],
+  [BadgeDollarSign, 'Plus ￥125', 'Plus ￥125'],
+  [BadgeDollarSign, 'Pro 5x ￥700', 'Pro 5x ￥700'],
+  [BadgeDollarSign, 'Pro 20x ￥1100', 'Pro 20x ￥1100'],
+  [BadgeDollarSign, 'Pro 25x ￥3200', 'Pro 25x ￥3200'],
   [Repeat2, '复购有优惠', 'Repeat-order discount'],
-  [BadgeCheck, '质保一个月的订阅', 'One-month subscription warranty'],
+  [BadgeCheck, '质保订阅一个月', 'One-month subscription warranty'],
+  [Headphones, '售后有保障', 'After-sales support'],
   [MapPin, '菲律宾', 'Philippines'],
   [MapPin, '智利', 'Chile'],
 ] as const;
@@ -92,6 +104,33 @@ const noticeGroups = [
 /* 把 **…** 渲染成 <strong>，省得为几个加粗词写一堆 JSX。 */
 function emphasize(text: string) {
   return text.split('**').map((part, index) => (index % 2 ? <strong key={index}>{part}</strong> : part));
+}
+
+/* 顶部导航图标。按「冰云首页有则复用、没有则保持原样」处理：
+   订单查询 / 全球价格比对沿用 ByBuy 原有图标；
+   AI 中转站、冰云小店、售后群、联系邮箱复用冰云首页（ByHome_UI）的导航标记。 */
+function NavIcon({ name }: { name: 'clock' | 'appstore' | 'openai' | 'bag' | 'users' | 'mail' }) {
+  if (name === 'clock') return <Clock3 size={17} aria-hidden="true" />;
+  if (name === 'appstore') return <span className="brand-icon appstore-icon" aria-hidden="true" />;
+  if (name === 'openai') return <svg aria-hidden="true" viewBox="0 0 24 24"><path fill="currentColor" d="M22.418 9.822a5.903 5.903 0 0 0-.52-4.91 6.1 6.1 0 0 0-2.822-2.513 6.204 6.204 0 0 0-3.78-.389A6.055 6.055 0 0 0 13.232.518 6.129 6.129 0 0 0 10.726 0a6.185 6.185 0 0 0-3.615 1.153A6.052 6.052 0 0 0 4.88 4.187a6.102 6.102 0 0 0-2.344 1.018A6.008 6.008 0 0 0 .828 7.087a5.981 5.981 0 0 0 .754 7.09 5.904 5.904 0 0 0 .52 4.911 6.101 6.101 0 0 0 2.821 2.513 6.205 6.205 0 0 0 3.78.389 6.057 6.057 0 0 0 2.065 1.492 6.13 6.13 0 0 0 2.505.518 6.185 6.185 0 0 0 3.617-1.154 6.052 6.052 0 0 0 2.232-3.035 6.101 6.101 0 0 0 2.343-1.018 6.009 6.009 0 0 0 1.709-1.883 5.981 5.981 0 0 0-.756-7.088Zm-9.143 12.609a4.583 4.583 0 0 1-2.918-1.04c.037-.02.102-.056.144-.081l4.844-2.76a.783.783 0 0 0 .397-.68v-6.738L17.79 12.3a.072.072 0 0 1 .04.055v5.58a4.473 4.473 0 0 1-1.335 3.176 4.596 4.596 0 0 1-3.219 1.321Zm-9.793-4.127a4.432 4.432 0 0 1-.544-3.014c.036.021.099.06.144.085l4.843 2.76a.796.796 0 0 0 .795 0l5.913-3.369V17.1a.071.071 0 0 1-.029.062L9.708 19.95a4.617 4.617 0 0 1-3.458.447 4.556 4.556 0 0 1-2.768-2.093ZM2.208 7.872A4.527 4.527 0 0 1 4.58 5.9l-.002.164v5.52a.768.768 0 0 0 .397.68l5.913 3.369-2.047 1.166a.075.075 0 0 1-.069.006l-4.896-2.792a4.51 4.51 0 0 1-2.12-2.73 4.45 4.45 0 0 1 .452-3.411Zm16.818 3.861-5.913-3.368 2.047-1.166a.074.074 0 0 1 .07-.006l4.896 2.789a4.526 4.526 0 0 1 1.762 1.815 4.448 4.448 0 0 1-.418 4.808 4.556 4.556 0 0 1-2.049 1.494v-5.686a.767.767 0 0 0-.395-.68Zm2.038-3.025a6.874 6.874 0 0 0-.144-.085l-4.843-2.76a.797.797 0 0 0-.796 0L9.368 9.23V6.9a.072.072 0 0 1 .03-.062l4.895-2.787a4.608 4.608 0 0 1 4.885.207 4.51 4.51 0 0 1 1.599 1.955c.333.788.433 1.654.287 2.496ZM8.255 12.865 6.208 11.7a.071.071 0 0 1-.04-.056v-5.58c0-.854.248-1.69.713-2.412a4.54 4.54 0 0 1 1.913-1.658 4.614 4.614 0 0 1 4.85.616c-.037.02-.102.055-.144.08L8.657 5.452a.782.782 0 0 0-.398.68l-.004 6.734ZM9.367 10.5 12.001 9l2.633 1.5v3L12.001 15l-2.634-1.5v-3Z" /></svg>;
+  if (name === 'bag') return <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7}><path d="m3 9 2-6h14l2 6M4 13v8h16v-8M9 21v-7h6v7" /><path d="M3 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0H3Z" /></svg>;
+  if (name === 'users') return <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m20 0v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /><circle cx="9" cy="7" r="4" /></svg>;
+  return <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7}><rect height="14" rx="3" width="18" x="3" y="5" /><path d="m3 7 9 6 9-6" /></svg>;
+}
+
+/* 桌面端居中排列、窄屏折叠进菜单面板，两处渲染同一份导航数据。 */
+function HeaderNav({ page, navigate }: { page: 'recharge' | 'order'; navigate: (next: 'recharge' | 'order') => void }) {
+  const { t } = useLocale();
+  return <>
+    <button type="button" onClick={() => navigate(page === 'order' ? 'recharge' : 'order')} className={page === 'order' ? 'active' : ''} aria-current={page === 'order' ? 'page' : undefined}>
+      <NavIcon name="clock" /><span>{t(page === 'order' ? 'home' : 'orders')}</span>
+    </button>
+    {navLinks.map(item => (
+      <a key={item.key} href={item.href} {...(item.external ? { target: '_blank', rel: 'noopener noreferrer' } : { title: EMAIL })}>
+        <NavIcon name={item.icon} /><span>{t(item.key)}</span>
+      </a>
+    ))}
+  </>;
 }
 
 function NoticeBoard() {
@@ -306,12 +345,23 @@ function Shell() {
   const { t, lang, theme, toggleLanguage, toggleTheme } = useLocale();
   const [page, setPage] = useState<'recharge' | 'order'>(location.pathname === '/order' ? 'order' : 'recharge');
   const [orderCode, setOrderCode] = useState('');
+  const menu = useRef<HTMLDetailsElement>(null);
   function navigate(next: 'recharge' | 'order', code = '') {
     setPage(next); setOrderCode(code); history.pushState(null, '', next === 'order' ? '/order' : '/');
   }
   useEffect(() => {
     const changed = () => { setPage(location.pathname === '/order' ? 'order' : 'recharge'); setOrderCode(''); };
     addEventListener('popstate', changed); return () => removeEventListener('popstate', changed);
+  }, []);
+  /* 窄屏菜单：点面板里任意一项就收起，点面板外也收起，
+     免得它浮在内容上面挡住表单。 */
+  useEffect(() => {
+    const outside = (event: MouseEvent) => {
+      const element = menu.current;
+      if (element?.open && !element.contains(event.target as Node)) element.open = false;
+    };
+    document.addEventListener('click', outside);
+    return () => document.removeEventListener('click', outside);
   }, []);
   return <>
     <a className="skip-link" href="#main-content">{t('skip')}</a>
@@ -321,19 +371,23 @@ function Shell() {
         <a href="/" className="brand" onClick={event => { event.preventDefault(); navigate('recharge'); }} aria-label={t('brand')}>
           <img src="/logo.png" width="32" height="32" alt="" /><span>{t('brand')}</span>
         </a>
+
         <nav aria-label={t('nav')} className="header-links">
-          <button onClick={() => navigate(page === 'order' ? 'recharge' : 'order')} className={page === 'order' ? 'active' : ''}><Clock3 size={16} aria-hidden="true" /><span>{t(page === 'order' ? 'home' : 'orders')}</span></button>
-          <a href={DOCS} target="_blank" rel="noopener noreferrer"><BookOpenText size={16} aria-hidden="true" /><span>{t('shop')}</span></a>
-          <a href={PRICES} target="_blank" rel="noopener noreferrer"><span className="brand-icon appstore-icon" aria-hidden="true" /><span>{t('prices')}</span></a>
-          <a href={BYAI} target="_blank" rel="noopener noreferrer"><span className="brand-icon chatgpt-icon" aria-hidden="true" /><span>{t('ai')}</span></a>
-          <a href={SUPPORT} target="_blank" rel="noopener noreferrer"><UsersRound size={16} aria-hidden="true" /><span>{t('support')}</span></a>
+          <HeaderNav page={page} navigate={navigate} />
         </nav>
+
         <div className="header-settings">
           <ServiceBadge />
-          <span className="settings-divider" />
+          <span className="settings-divider" aria-hidden="true" />
           <button className="icon-button" onClick={toggleTheme} aria-label={t(theme === 'light' ? 'dark' : 'light')}>{theme === 'light' ? <Moon size={17} /> : <Sun size={17} />}</button>
-          <span className="settings-divider" />
+          <span className="settings-divider" aria-hidden="true" />
           <button className="language-button" onClick={toggleLanguage} aria-label={t('language')}><Languages size={16} /><span>{lang === 'zh' ? 'EN' : '中文'}</span></button>
+          <details className="header-menu" ref={menu}>
+            <summary aria-label={t('menu')}><span className="burger" aria-hidden="true" /></summary>
+            <div className="header-menu-panel" onClick={() => { if (menu.current) menu.current.open = false; }}>
+              <HeaderNav page={page} navigate={navigate} />
+            </div>
+          </details>
         </div>
       </div>
     </header>

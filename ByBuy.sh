@@ -164,8 +164,11 @@ get_env() {
 
 set_env() {
   local key="$1" value="$2" temp
+  [[ "$key" =~ ^[A-Z_][A-Z0-9_]*$ ]] || die "无效的环境变量名：$key"
+  [[ "$value" != *$'\n'* && "$value" != *$'\r'* ]] || die "$key 不能包含换行符。"
   temp="$(mktemp)"
-  awk -v key="$key" -v value="$value" '
+  BYBUY_SET_KEY="$key" BYBUY_SET_VALUE="$value" awk '
+    BEGIN { key=ENVIRON["BYBUY_SET_KEY"]; value=ENVIRON["BYBUY_SET_VALUE"] }
     BEGIN { done=0 }
     $0 ~ "^" key "=" { print key "=" value; done=1; next }
     { print }
@@ -173,6 +176,25 @@ set_env() {
   ' "$ROOT/.env" > "$temp"
   chmod 600 "$temp"
   mv "$temp" "$ROOT/.env"
+}
+
+persist_proxy_env() {
+  local key lower value existing copied=()
+  for key in HTTP_PROXY HTTPS_PROXY NO_PROXY; do
+    lower="${key,,}"
+    value="${!key:-}"
+    [[ -n "$value" ]] || value="${!lower:-}"
+    [[ -n "$value" ]] || continue
+    existing="$(get_env "$key")"
+    [[ -n "$existing" ]] || existing="$(get_env "$lower")"
+    if [[ -z "$existing" ]]; then
+      set_env "$key" "$value"
+      copied+=("$key")
+    fi
+  done
+  if [[ ${#copied[@]} -gt 0 ]]; then
+    log INFO CONFIG "检测到当前环境的网络代理配置，已写入受保护的 .env：${copied[*]}（值不写入日志）。"
+  fi
 }
 
 prepare_env() {
@@ -193,6 +215,7 @@ prepare_env() {
     fi
   fi
   set_env HOST "0.0.0.0"
+  persist_proxy_env
   log OK CONFIG ".env 检查完成，敏感值不会打印到日志。"
 }
 
@@ -208,6 +231,23 @@ random_free_port() {
     if ! port_in_use "$port"; then printf '%s\n' "$port"; return; fi
   done
   return 1
+}
+
+# 停掉上一版遗留的后台进程（run/bybuy.pid）。systemd 模式下由 systemctl stop 负责。
+stop_background_process() {
+  local pid=''
+  [[ -f "$RUN_DIR/bybuy.pid" ]] && pid="$(cat "$RUN_DIR/bybuy.pid" 2>/dev/null || true)"
+  if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+    kill "$pid" 2>/dev/null || true
+    local attempt
+    for attempt in $(seq 1 20); do
+      kill -0 "$pid" 2>/dev/null || break
+      sleep 0.2
+    done
+    if kill -0 "$pid" 2>/dev/null; then kill -9 "$pid" 2>/dev/null || true; fi
+    log INFO SERVICE "已停止现有后台进程（PID=$pid）以便更新。"
+  fi
+  rm -f "$RUN_DIR/bybuy.pid"
 }
 
 choose_port() {
@@ -248,7 +288,7 @@ install_systemd_service() {
   temp="$(mktemp)"
   cat > "$temp" <<EOF
 [Unit]
-Description=AITop-Up web service
+Description=ByBuy web service
 After=network-online.target
 Wants=network-online.target
 
@@ -285,9 +325,7 @@ EOF
 }
 
 start_background() {
-  local old_pid=''
-  [[ -f "$RUN_DIR/bybuy.pid" ]] && old_pid="$(cat "$RUN_DIR/bybuy.pid" 2>/dev/null || true)"
-  if [[ -n "$old_pid" ]] && kill -0 "$old_pid" 2>/dev/null; then kill "$old_pid" || true; fi
+  stop_background_process
   nohup "$NODE_BIN" --env-file-if-exists=.env --use-env-proxy "$ROOT/server/index.mjs" >> "$LOG_DIR/runtime.log" 2>&1 &
   printf '%s\n' "$!" > "$RUN_DIR/bybuy.pid"
   LOG_COMMAND="tail -f $LOG_DIR/runtime.log"
@@ -331,13 +369,18 @@ main() {
   case "${BYBUY_ENABLE_SERVICE:-ask}" in
     1|Y|y|yes|YES) enable_service=1; log INFO SERVICE "已通过 BYBUY_ENABLE_SERVICE 启用 systemd。" ;;
     0|N|n|no|NO) enable_service=0; log INFO SERVICE "已通过 BYBUY_ENABLE_SERVICE 禁用 systemd。" ;;
-    ask) if ask_yes_no "是否启用 systemd 系统服务（不使用 Docker，推荐）？" Y; then enable_service=1; fi ;;
+    ask) if ask_yes_no "是否启用 systemd 系统服务（推荐）？" Y; then enable_service=1; fi ;;
     *) die "BYBUY_ENABLE_SERVICE 只能是 0、1 或 ask。" ;;
   esac
+
+  # 更新场景：先把上一个版本停掉，再选端口。
+  # 否则旧进程还占着 PORT，choose_port 会误判为「被占用」而改用一个随机端口，
+  # 反向代理指向的端口就跟着变了。
   if [[ $enable_service -eq 1 ]] && systemd_available && systemctl list-unit-files "$SERVICE_NAME.service" >/dev/null 2>&1; then
     as_root systemctl stop "$SERVICE_NAME.service" 2>/dev/null || true
     log INFO SERVICE "已停止现有 systemd 服务以便更新。"
   fi
+  stop_background_process
 
   choose_port
   build_project
@@ -354,9 +397,9 @@ main() {
   wait_for_health
   print_addresses
   log INFO LOG "安装日志：$INSTALL_LOG"
-  log INFO LOG "应用日志分类：LIFECYCLE / HTTP / SECURITY / ORDER / REMOTE / HEALTH / ERROR"
+  log INFO LOG "应用日志分类：LIFECYCLE / HTTP / SECURITY / SUBSCRIPTION / ORDER / REMOTE / HEALTH / ERROR"
   log INFO LOG "实时查看：$LOG_COMMAND"
-  log OK SYSTEM "AITop-Up 部署完成。"
+  log OK SYSTEM "ByBuy 部署完成。"
 }
 
 main "$@"

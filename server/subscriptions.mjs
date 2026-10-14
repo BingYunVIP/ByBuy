@@ -5,7 +5,6 @@ import {
 } from '../shared/subscription.ts';
 
 const ACCOUNT_URL = 'https://chatgpt.com/backend-api/accounts/check/v4-2023-04-27';
-const SUBSCRIPTION_URL = 'https://chatgpt.com/backend-api/subscriptions';
 
 // chatgpt.com 由 Cloudflare 提供机器人防护。只带 Authorization + Accept 的请求会被
 // 直接判定为脚本流量并返回 403。下面这组头部只声明「这是一个浏览器发起的普通请求」，
@@ -27,10 +26,7 @@ const MESSAGES = {
   CHECK_TIMEOUT: '等待 ChatGPT 响应超时，请稍后重试。',
   CHECK_UNAVAILABLE: '暂时无法连接 ChatGPT，请稍后重试。',
   CHECK_RESPONSE_UNKNOWN: '暂时无法识别 ChatGPT 返回的订阅资料。',
-  CHECK_SCOPE_MISMATCH: '返回资料的账号归属不一致，未合并该结果。',
   WORKSPACE_NOT_ACCESSIBLE: '当前凭证未能确认所选工作区，请重新选择或更新资料。',
-  SUBSCRIPTION_RECORDS_DIFFER: '在线订阅状态存在不一致，本次未确认有效状态。',
-  SUBSCRIPTION_DATES_DIFFER: '在线来源的订阅周期不一致，本次未确认周期终点。',
 };
 
 export function readSubscriptionInput(body, now = Date.now()) {
@@ -62,7 +58,7 @@ export function readSubscriptionInput(body, now = Date.now()) {
 }
 
 class CheckError extends Error {
-  constructor(code) { super(MESSAGES[code]); this.code = code; }
+  constructor(code, retryable = false) { super(MESSAGES[code]); this.code = code; this.retryable = retryable; }
 }
 
 async function boundedJson(response) {
@@ -157,25 +153,8 @@ function parseWorkspaces(body, now) {
   return { workspaces: [...workspaces.values()], coverage: incomplete ? 'partial' : 'complete' };
 }
 
-function parseSubscription(body, target, now) {
-  if (body.account_id !== undefined && accountIdentifier(body.account_id) !== target) throw new CheckError('CHECK_SCOPE_MISMATCH');
-  const plan = normalizePlan(body.plan_type);
-  if (!plan) throw new CheckError('CHECK_RESPONSE_UNKNOWN');
-  const periodEnd = isoTime(body.active_until);
-  if (body.active_until !== undefined && body.active_until !== null && !periodEnd) throw new CheckError('CHECK_RESPONSE_UNKNOWN');
-  const active = typeof body.has_active_subscription === 'boolean' ? body.has_active_subscription : null;
-  return currentPersonalState({
-    accountId: target, accountMasked: maskIdentifier(target),
-    scope: body.structure === 'personal' ? 'personal'
-      : ['team', 'workspace', 'business'].includes(body.structure) || planScope(plan) === 'workspace' ? 'workspace' : 'unknown', plan,
-    status: deriveStatus(plan, active, periodEnd, now), periodStart: isoTime(body.active_start), periodEnd,
-    willRenew: typeof body.will_renew === 'boolean' ? body.will_renew : null,
-    source: 'live_subscription',
-  });
-}
-
 export function createSubscriptionChecker({ fetchImpl = globalThis.fetch, now = Date.now, timeoutMs = 20_000 } = {}) {
-  async function get(url, token, signal) {
+  async function getOnce(url, token, signal) {
     try {
       const response = await fetchImpl(url, {
         method: 'GET',
@@ -185,76 +164,62 @@ export function createSubscriptionChecker({ fetchImpl = globalThis.fetch, now = 
       if (!response.ok) {
         await response.body?.cancel();
         throw new CheckError(response.status === 401 ? 'CREDENTIAL_REJECTED'
-          : response.status === 403 ? 'ACCESS_RESTRICTED' : response.status === 429 ? 'CHECK_RATE_LIMITED' : 'CHECK_UNAVAILABLE');
+          : response.status === 403 ? 'ACCESS_RESTRICTED' : response.status === 429 ? 'CHECK_RATE_LIMITED' : 'CHECK_UNAVAILABLE', response.status === 408 || response.status >= 500);
       }
       return await boundedJson(response);
     } catch (error) {
       if (error instanceof CheckError) throw error;
-      if (error.name === 'TimeoutError' || error.name === 'AbortError') throw new CheckError('CHECK_TIMEOUT');
+      if (error.name === 'TimeoutError' || error.name === 'AbortError') throw new CheckError('CHECK_TIMEOUT', true);
       if (error instanceof SyntaxError) throw new CheckError('CHECK_RESPONSE_UNKNOWN');
-      throw new CheckError('CHECK_UNAVAILABLE');
+      throw new CheckError('CHECK_UNAVAILABLE', true);
     }
+  }
+  async function get(url, token, callerSignal) {
+    const deadline = Date.now() + timeoutMs;
+    let lastError = new CheckError('CHECK_TIMEOUT', true);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (callerSignal?.aborted) throw lastError;
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) throw lastError;
+      // The first attempt receives most of the budget; a short second attempt absorbs
+      // transient edge/network failures without extending the browser's 30 s deadline.
+      const budget = attempt === 0 ? Math.max(1, Math.floor(remaining * 0.65)) : remaining;
+      const timeout = AbortSignal.timeout(budget);
+      const signal = callerSignal ? AbortSignal.any([callerSignal, timeout]) : timeout;
+      try { return await getOnce(url, token, signal); }
+      catch (error) {
+        lastError = error instanceof CheckError ? error : new CheckError('CHECK_RESPONSE_UNKNOWN');
+        if (!lastError.retryable || callerSignal?.aborted || attempt === 1) throw lastError;
+      }
+    }
+    throw lastError;
   }
   return {
     async check(input, callerSignal) {
       const started = now();
-      const timeout = AbortSignal.timeout(timeoutMs);
-      const signal = callerSignal ? AbortSignal.any([callerSignal, timeout]) : timeout;
       const checks = [];
       const outcome = { checkedAt: new Date(started).toISOString(), credentialState: 'unconfirmed', selected: null, workspaces: [], workspaceCoverage: 'unavailable', checks };
       const fail = (source, error) => {
         const code = error instanceof CheckError ? error.code : 'CHECK_RESPONSE_UNKNOWN';
         checks.push({ source, ok: false, code, message: MESSAGES[code] });
       };
-      const succeed = source => checks.push({ source, ok: true, code: 'OK', message: source === 'live_workspace' ? '已取得可见工作区资料。' : '已取得所选账号的订阅资料。' });
+      const succeed = () => checks.push({ source: 'live_workspace', ok: true, code: 'OK', message: '已取得可见工作区资料。' });
       try {
-        const body = await get(ACCOUNT_URL, input.accessToken, signal);
+        const body = await get(ACCOUNT_URL, input.accessToken, callerSignal);
         const parsed = parseWorkspaces(body, started);
         outcome.workspaces = parsed.workspaces;
         outcome.workspaceCoverage = parsed.coverage;
         outcome.credentialState = 'accepted';
-        succeed('live_workspace');
+        const matching = parsed.workspaces.find(workspace => workspace.accountId === input.accountId);
+        if (!matching) fail('live_workspace', new CheckError('WORKSPACE_NOT_ACCESSIBLE'));
+        else { outcome.selected = matching; succeed(); }
       } catch (error) { fail('live_workspace', error); }
 
       const matching = outcome.workspaces.find(workspace => workspace.accountId === input.accountId);
-      // Never guess that a default/POID record belongs to the token's account.
-      // A different target must first appear in the authenticated workspace list.
-      if (input.accountId !== input.tokenAccountId && !matching) {
-        fail('live_subscription', new CheckError('WORKSPACE_NOT_ACCESSIBLE'));
-      } else if (!callerSignal?.aborted && checks[0]?.code !== 'CREDENTIAL_REJECTED') {
-        try {
-          const url = new URL(SUBSCRIPTION_URL);
-          url.searchParams.set('account_id', input.accountId);
-          const body = await get(url, input.accessToken, signal);
-          outcome.selected = parseSubscription(body, input.accountId, started);
-          outcome.credentialState = 'accepted';
-          succeed('live_subscription');
-        } catch (error) { fail('live_subscription', error); }
-      }
-
-      if (!outcome.selected && matching && !checks.some(check => check.code === 'CHECK_SCOPE_MISMATCH')) outcome.selected = matching;
-      if (outcome.selected && matching && outcome.selected.source === 'live_subscription') {
-        if (outcome.selected.scope === 'unknown') outcome.selected.scope = matching.scope;
-        else if (matching.scope !== 'unknown' && outcome.selected.scope !== matching.scope) {
-          outcome.selected = { ...outcome.selected, scope: 'unknown', status: 'unknown', periodStart: null, periodEnd: null };
-          fail('live_subscription', new CheckError('CHECK_SCOPE_MISMATCH'));
-        }
-        const comparable = status => ['active', 'inactive', 'free'].includes(status);
-        const disagrees = comparable(outcome.selected.status) && comparable(matching.status)
-          && (outcome.selected.status !== matching.status || (matching.plan && outcome.selected.plan !== matching.plan));
-        if (disagrees) {
-          outcome.selected = { ...outcome.selected, plan: null, status: 'unknown', periodEnd: null, willRenew: null };
-          fail('live_subscription', new CheckError('SUBSCRIPTION_RECORDS_DIFFER'));
-        } else if (outcome.selected.periodEnd && matching.periodEnd && outcome.selected.periodEnd !== matching.periodEnd) {
-          outcome.selected = { ...outcome.selected, periodEnd: null };
-          fail('live_subscription', new CheckError('SUBSCRIPTION_DATES_DIFFER'));
-        }
-      }
-      const hasIdentityConflict = checks.some(check => ['CHECK_SCOPE_MISMATCH', 'SUBSCRIPTION_RECORDS_DIFFER'].includes(check.code));
       const hasActivePaidEvidence = (outcome.selected?.status === 'active' && knownPaidPlan(outcome.selected.plan))
         || (matching?.status === 'active' && knownPaidPlan(matching.plan));
       if (outcome.credentialState === 'accepted' && input.accountId === input.tokenAccountId && input.tokenPlan === 'free'
-        && outcome.selected && outcome.selected.scope !== 'workspace' && !hasIdentityConflict && !hasActivePaidEvidence
+        && outcome.selected?.scope === 'personal' && !hasActivePaidEvidence
         && ['inactive', 'unknown', 'free'].includes(outcome.selected.status)) {
         outcome.selected = { ...outcome.selected, scope: 'personal', plan: 'free', status: 'free', periodStart: null, periodEnd: null, willRenew: false };
       }

@@ -63,20 +63,20 @@ with sync_playwright() as p:
         expect(page.get_by_text('卡密即凭证，请勿泄露给他人。',exact=True)).to_be_visible()
         assert page.locator('.brand img').get_attribute('src')=='/logo.png'
         expect(page.get_by_role('link',name='AI代充',exact=True)).to_be_visible()
-        for promise in ['官方渠道','正规VISA资金','只收人工费','失败可退','数据加密传输','Plus 125r','Pro 5x 700r','Pro 20x 1100r','Pro 25x 3200r','复购有优惠','质保一个月的订阅','菲律宾','智利']:
+        for promise in ['官方渠道','正规VISA资金','只收人工费','失败可退','数据加密传输','Plus ￥125','Pro 5x ￥700','Pro 20x ￥1100','Pro 25x ￥3200','复购有优惠','质保订阅一个月','售后有保障','菲律宾','智利']:
             expect(page.get_by_text(promise,exact=True)).to_be_visible()
-        assert page.locator('.header-links > *').all_text_contents()[:2]==['订单查询','文档教程']
-        assert page.locator('.header-links').get_by_role('link').all_text_contents()[-2:]==['AI 中转站','售后群']
-        for label,url in [('文档教程','https://docs.bingyun.vip/zh/posts/shop/chatgpt/'),('全球价格对比','https://appstoreprice.org/zh/apps/6448311069'),('AI 中转站','https://api.bingyun.vip'),('售后群','https://qm.qq.com/q/6fuAq8mBwW')]:
+        assert page.locator('.header-links > *').all_text_contents()==['订单查询','全球价格对比','AI 中转站','冰云小店','售后群','联系邮箱']
+        for label,url in [('全球价格对比','https://appstoreprice.org/zh/apps/6448311069'),('AI 中转站','https://api.bingyun.vip'),('冰云小店','https://shop.bingyun.vip'),('售后群','https://qm.qq.com/q/6fuAq8mBwW')]:
             a=page.get_by_role('link',name=label,exact=True)
             expect(a).to_have_attribute('href',url)
             expect(a).to_have_attribute('target','_blank')
             assert 'noopener' in a.get_attribute('rel')
+        expect(page.get_by_role('link',name='联系邮箱',exact=True)).to_have_attribute('href','mailto:support@bingyun.vip')
         notice_toggle=page.locator('.notice-board-head')
         expect(notice_toggle).to_have_attribute('aria-expanded','true')
         expect(page.locator('.notice-groups')).to_be_visible()
         expect(page.get_by_text(re.compile('包括但不限于破限、邮件欺诈'))).to_be_visible()
-        assert page.locator('.notice-groups').get_by_text('质保一个月的订阅',exact=True).count()==0
+        assert page.locator('.notice-groups').get_by_text('质保订阅一个月',exact=True).count()==0
         notice_toggle.click()
         expect(notice_toggle).to_have_attribute('aria-expanded','false')
         assert page.locator('.notice-groups').count()==0
@@ -91,28 +91,28 @@ with sync_playwright() as p:
         }""")
         expect(page.get_by_role('button',name='2 验证卡密',exact=True)).to_be_disabled()
         expect(page.get_by_role('button',name='3 完成提交',exact=True)).to_be_disabled()
-        audit('light-empty')
-        page.screenshot(path=str(ARTIFACTS/'redesign-desktop.png'),full_page=True)
-
-        page.get_by_role('button',name='切换深色模式',exact=True).click()
         expect(page.locator('html')).to_have_attribute('data-theme','dark')
         audit('dark-empty')
         page.screenshot(path=str(ARTIFACTS/'redesign-dark.png'),full_page=True)
+        page.get_by_role('button',name='切换浅色模式',exact=True).click()
+        expect(page.locator('html')).to_have_attribute('data-theme','light')
+        audit('light-empty')
+        page.screenshot(path=str(ARTIFACTS/'redesign-desktop.png'),full_page=True)
         page.get_by_role('button',name='Switch to English',exact=True).click()
-        expect(page.get_by_role('link',name='Docs',exact=True)).to_be_visible()
-        expect(page.get_by_role('link',name='LowestPrice',exact=True)).to_be_visible()
-        expect(page.get_by_role('link',name='AIRouter',exact=True)).to_be_visible()
-        expect(page.get_by_role('link',name='AITop-Up',exact=True)).to_be_visible()
-        expect(page.get_by_role('link',name='SupportGroup',exact=True)).to_be_visible()
+        expect(page.get_by_role('link',name='Price Compare',exact=True)).to_be_visible()
+        expect(page.get_by_role('link',name='AI Router',exact=True)).to_be_visible()
+        expect(page.get_by_role('link',name='Store',exact=True)).to_be_visible()
+        expect(page.get_by_role('link',name='AI Top-Up',exact=True)).to_be_visible()
+        expect(page.get_by_role('link',name='Support',exact=True)).to_be_visible()
+        expect(page.get_by_role('link',name='Email',exact=True)).to_be_visible()
         expect(page.locator('html')).to_have_attribute('lang','en')
         page.reload(wait_until='networkidle')
         expect(page.get_by_role('heading',name='ChatGPT Self-Service Top-Up',exact=True)).to_be_visible()
         for promise in ['Repeat-order discount','One-month subscription warranty','Philippines','Chile']:
             expect(page.get_by_text(promise,exact=True)).to_be_visible()
-        expect(page.locator('html')).to_have_attribute('data-theme','dark')
-        audit('dark-english')
+        expect(page.locator('html')).to_have_attribute('data-theme','light')
+        audit('light-english')
         page.get_by_role('button',name='切换中文',exact=True).click()
-        page.get_by_role('button',name='切换浅色模式',exact=True).click()
 
         page.get_by_role('button',name='检查订阅',exact=True).click()
         expect(page.get_by_role('status')).to_contain_text('完整、有效的 JSON')

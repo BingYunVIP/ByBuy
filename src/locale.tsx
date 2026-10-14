@@ -3,8 +3,8 @@ import type { ReactNode } from 'react';
 
 const zh = {
   brand: 'AI代充', shop: '文档教程', prices: '全球价格对比', ai: 'AI 中转站', orders: '订单查询',
-  support: '售后群',
-  home: '返回充值', nav: '主导航', light: '切换浅色模式', dark: '切换深色模式', language: 'Switch to English',
+  support: '售后群', store: '冰云小店', email: '联系邮箱',
+  home: '返回充值', nav: '主导航', menu: '菜单', light: '切换浅色模式', dark: '切换深色模式', language: 'Switch to English',
   skip: '跳转到主要内容', title: 'ChatGPT 自助充值', heroTitle: 'ChatGPT 自助充值', subtitle: '简单几步，为你的灵感续航。',
   servicePromises: '服务承诺', officialChannel: 'ChatGPT官方渠道充值', visaFunds: '正规VISA资金', laborOnly: '只收取人工费', fastService: '快速处理', refund: '失败可退', encrypted: '数据加密传输',
 
@@ -54,7 +54,7 @@ const zh = {
   faq2q: '为什么要求账号是个人 Free？',
   faq2a: '充值流程针对个人 Free 账号设计。团队账号与已付费账号的处理方式不同，请先切换个人账号，或等待当前订阅到期后再来。',
   faq3q: '如何购买卡密？',
-  faq3a: '点击顶部「文档教程」查看购买和使用说明。卡密即凭证，请勿泄露给他人。',
+  faq3a: '在顶部「冰云小店」购买卡密，卡密即凭证，请勿泄露给他人。',
   faq4q: '充值需要多久完成？',
   faq4a: '提交后我们会尽快安排处理。你可以在「订单查询」中输入原卡密，随时查看订单状态与完成时间。',
   faq5q: '如果充值失败怎么办？',
@@ -103,9 +103,9 @@ const zh = {
   dateNote: '时间为 UTC+8', missingAccess: '请获取包含访问令牌的完整登录资料。',
 };
 const en: Record<keyof typeof zh, string> = {
-  brand: 'AITop-Up', shop: 'Docs', prices: 'LowestPrice', ai: 'AIRouter', orders: 'Orders',
-  support: 'SupportGroup',
-  home: 'Back to top-up', nav: 'Main navigation', light: 'Switch to light mode', dark: 'Switch to dark mode', language: '切换中文',
+  brand: 'AI Top-Up', shop: 'Docs', prices: 'Price Compare', ai: 'AI Router', orders: 'Orders',
+  support: 'Support', store: 'Store', email: 'Email',
+  home: 'Back to top-up', nav: 'Main navigation', menu: 'Menu', light: 'Switch to light mode', dark: 'Switch to dark mode', language: '切换中文',
   skip: 'Skip to content', title: 'ChatGPT, topped up.', heroTitle: 'ChatGPT Self-Service Top-Up', subtitle: 'A few simple steps. More room for inspiration.',
   servicePromises: 'Our service commitments', officialChannel: 'ChatGPT official-channel top-ups', visaFunds: 'Legitimate VISA payments', laborOnly: 'Service fee only', fastService: 'Fast processing', refund: 'Refund if unsuccessful', encrypted: 'Encrypted data transfer',
 
@@ -150,7 +150,7 @@ const en: Record<keyof typeof zh, string> = {
   faq2q: 'Why does it have to be a personal Free account?',
   faq2a: 'The flow is built for personal Free accounts. Team and already-paid accounts are handled differently — switch to your personal account, or come back once the current subscription expires.',
   faq3q: 'How do I buy a redemption code?',
-  faq3a: 'Open Docs from the top navigation for purchase and usage instructions. Your code is your proof of purchase — keep it private.',
+  faq3a: 'Buy your code from Store in the top navigation. Your code is your proof of purchase — keep it private.',
   faq4q: 'How long does the top-up take?',
   faq4a: 'We handle it as soon as it is submitted. Enter your code under Orders at any time to see the status and completion time.',
   faq5q: 'What if the top-up fails?',
@@ -206,7 +206,8 @@ const preferenceKey = 'bybuy.preferences.v1';
 function preferences(): { lang: Language; theme: Theme } {
   let saved: { lang?: string; theme?: string } = {};
   try { saved = JSON.parse(localStorage.getItem(preferenceKey) || '{}') ?? {}; } catch { /* private browsing */ }
-  return { lang: saved.lang === 'en' ? 'en' : 'zh', theme: saved.theme === 'dark' || (saved.theme !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light' };
+  /* 默认暗色，与冰云首页保持一致；只有用户显式切过浅色，才按浅色渲染。 */
+  return { lang: saved.lang === 'en' ? 'en' : 'zh', theme: saved.theme === 'light' ? 'light' : 'dark' };
 }
 export function LocaleProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState(preferences);
@@ -214,7 +215,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
     document.documentElement.dataset.theme = theme;
-    document.title = lang === 'zh' ? 'AI代充 · ChatGPT 自助充值' : 'AITop-Up · ChatGPT top-up';
+    document.title = lang === 'zh' ? 'AI代充 · ChatGPT 自助充值' : 'AI Top-Up · ChatGPT top-up';
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#0e1116' : '#f4f5f7');
     try { localStorage.setItem(preferenceKey, JSON.stringify(settings)); } catch { /* preferences are optional */ }
   }, [settings, lang, theme]);

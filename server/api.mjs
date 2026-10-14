@@ -133,7 +133,17 @@ export function createApi({ upstream = createUpstream(), subscriptions = createS
     res.on('close', cancel);
     try {
       const data = await subscriptions.check(input, controller.signal);
-      if (!controller.signal.aborted) res.json({ ok: true, data: { ...data, eligibility: eligibility.issue(data, input.accountId) } });
+      if (!controller.signal.aborted) {
+        const grant = eligibility.issue(data, input.accountId);
+        appLog.info('SUBSCRIPTION', 'CHECK_COMPLETED', {
+          requestId: res.locals.requestId,
+          credentialState: data.credentialState,
+          result: data.selected ? `${data.selected.scope}:${data.selected.status}` : 'unconfirmed',
+          eligibilityIssued: Boolean(grant),
+          checks: data.checks.map(check => `${check.source}:${check.code}`).join(','),
+        });
+        res.json({ ok: true, data: { ...data, eligibility: grant } });
+      }
     } finally { res.off('close', cancel); }
   });
 

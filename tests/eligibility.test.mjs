@@ -55,8 +55,10 @@ test('Free workspace does not become a personal account merely because its plan 
 });
 
 test('missing scope cannot unlock card verification', async () => {
-  const checker = createSubscriptionChecker({ now: () => REFERENCE_TIME, fetchImpl: async url => new Response(JSON.stringify(new URL(url).pathname.includes('accounts/check') ? {} : { plan_type: 'free' }), { headers: { 'content-type': 'application/json' } }) });
-  const result = await checker.check(readSubscriptionInput({ accessToken: credentials().access_token }, REFERENCE_TIME));
+  const body = { accounts: { [ACCOUNT]: workspace(ACCOUNT, 'free', false, null) } };
+  delete body.accounts[ACCOUNT].account.structure;
+  const checker = createSubscriptionChecker({ now: () => REFERENCE_TIME, fetchImpl: async () => new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } }) });
+  const result = await checker.check(readSubscriptionInput({ accessToken: credentials({ plan: 'free' }).access_token }, REFERENCE_TIME));
   assert.equal(result.selected.scope, 'unknown');
   assert.equal(createEligibilityStore().issue(result, ACCOUNT), null);
 });

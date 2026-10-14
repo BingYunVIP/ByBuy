@@ -56,6 +56,19 @@ test('Session Free is a current-snapshot label only, and Google login is not a b
   assert.doesNotMatch(JSON.stringify(report), /2027-01-09/);
 });
 
+test('full Session exports may contain auxiliary metadata without retaining non-access credentials', () => {
+  const file = sessionFile();
+  file.WARNING_BANNER = 'SYNTHETIC_WARNING';
+  file.marketingEligibility = { segment: 'test' };
+  file.statsigContext = { locale: 'zh-CN', deviceId: 'synthetic-device' };
+  file.sessionToken = 'SYNTHETIC_SESSION_'.repeat(300);
+  const [account] = parse(file);
+  assert.equal(account.report.format, 'session');
+  assert.equal(account.report.observedPlan, 'free');
+  assert.equal(account.onlineBlockedReason, null);
+  assert.doesNotMatch(JSON.stringify(account), /SYNTHETIC_SESSION_|synthetic-device|SYNTHETIC_WARNING/);
+});
+
 test('unknown or absent plans never become Free; raw unfamiliar identifiers remain visible', () => {
   const missing = parse({ account: { id: ACCOUNT, structure: 'personal' } })[0];
   assert.equal(missing.report.observedPlan, null);
@@ -115,27 +128,30 @@ test('multiple accounts are kept separate and reports strip online account IDs t
   assert.equal('accountId' in exported.online.workspaces[0], false);
 });
 
-test('online requests are fixed read-only ChatGPT calls and ignore unscoped default organization data', async () => {
+test('online requests are fixed read-only ChatGPT calls and ignore unrelated response fields', async () => {
   const calls = [];
+  const personal = workspace(ACCOUNT, 'plus', true, '2026-10-30T18:52:44Z');
+  personal.entitlement.will_renew = false;
+  personal.amount = 'untrusted';
+  personal.message = 'advertisement.example';
   const checker = createSubscriptionChecker({ now: () => REFERENCE_TIME, fetchImpl: async (url, init) => {
     const target = new URL(url); calls.push(target);
     assert.equal(target.origin, 'https://chatgpt.com');
+    assert.ok(target.pathname.includes('accounts/check'));
     assert.equal(init.method, 'GET');
     assert.equal(init.redirect, 'error');
     assert.equal(init.body, undefined);
     assert.equal(init.headers.Authorization, `Bearer ${credentials().access_token}`);
-    if (target.pathname.includes('accounts/check')) return json({ accounts: { [ORGANIZATION]: workspace(ORGANIZATION, 'business', true, '2027-03-01T00:00:00Z'), default: ORGANIZATION } });
-    assert.equal(target.searchParams.get('account_id'), ACCOUNT);
-    return json({ plan_type: 'plus', active_until: '2026-10-30T18:52:44Z', will_renew: false, amount: 'untrusted', message: 'advertisement.example' });
+    return json({ accounts: { [ACCOUNT]: personal, [ORGANIZATION]: workspace(ORGANIZATION, 'business', true, '2027-03-01T00:00:00Z'), default: ACCOUNT } });
   } });
   const result = await checker.check(requestInput());
   assert.equal(result.selected.plan, 'plus');
   assert.equal(result.selected.status, 'active');
   assert.equal(result.selected.willRenew, false);
   assert.equal(result.selected.periodEnd, '2026-10-30T18:52:44.000Z');
-  assert.equal(result.workspaces[0].plan, 'business');
+  assert.equal(result.workspaces.find(item => item.accountId === ORGANIZATION).plan, 'business');
   assert.equal(result.credentialState, 'accepted');
-  assert.equal(calls.length, 2);
+  assert.equal(calls.length, 1);
   assert.doesNotMatch(JSON.stringify(result), /untrusted|advertisement|Bearer|synthetic_signature/);
 });
 
@@ -143,10 +159,8 @@ test('personal Free and team Business stay separate, and requested workspace mus
   const calls = [];
   const checker = createSubscriptionChecker({ now: () => REFERENCE_TIME, fetchImpl: async url => {
     const target = new URL(url); calls.push(target);
-    if (target.pathname.includes('accounts/check')) return json({ accounts: { [ACCOUNT]: workspace(ACCOUNT, 'free', false, null), [TEAM]: workspace(TEAM, 'business'), default: ACCOUNT } });
-    return json(target.searchParams.get('account_id') === TEAM
-      ? { plan_type: 'business', active_until: '2026-10-30T18:52:44Z', will_renew: true }
-      : { plan_type: 'free', active_until: null });
+    assert.ok(target.pathname.includes('accounts/check'));
+    return json({ accounts: { [ACCOUNT]: workspace(ACCOUNT, 'free', false, null), [TEAM]: workspace(TEAM, 'business'), default: ACCOUNT } });
   } });
   const personal = await checker.check(requestInput());
   assert.equal(personal.selected.status, 'free');
@@ -160,72 +174,66 @@ test('personal Free and team Business stay separate, and requested workspace mus
   assert.equal(invalid.checks.at(-1).code, 'WORKSPACE_NOT_ACCESSIBLE');
 });
 
-test('unknown subscription strings, conflicting scopes and ambiguous entitlement never confirm membership', async () => {
-  for (const [body, expectedCode] of [
-    [{ plan_type: 'plus', account_id: TEAM, active_until: '2026-10-30T18:52:44Z' }, 'CHECK_SCOPE_MISMATCH'],
-    [{}, 'CHECK_RESPONSE_UNKNOWN'],
-    [{ plan_type: 'plus', active_until: 'invalid-date' }, 'CHECK_RESPONSE_UNKNOWN'],
-  ]) {
-    const checker = createSubscriptionChecker({ now: () => REFERENCE_TIME, fetchImpl: async url => new URL(url).pathname.includes('accounts/check')
-      ? json({ accounts: { [ACCOUNT]: workspace() } }) : json(body) });
-    const result = await checker.check(requestInput());
-    assert.equal(result.checks.at(-1).code, expectedCode);
-    if (expectedCode === 'CHECK_SCOPE_MISMATCH') assert.equal(result.selected, null);
-  }
-  const checker = createSubscriptionChecker({ now: () => REFERENCE_TIME, fetchImpl: async url => new URL(url).pathname.includes('accounts/check')
-    ? json({ accounts: { [ACCOUNT]: workspace(ACCOUNT, 'new-plan', null, null) } })
-    : json({ plan_type: 'new-plan', active_until: '2026-10-30T18:52:44Z' }) });
-  assert.equal((await checker.check(requestInput())).selected.status, 'unknown');
+test('unknown, malformed and inaccessible account records never confirm membership', async () => {
+  const unknown = await createSubscriptionChecker({ now: () => REFERENCE_TIME, fetchImpl: async () => json({ accounts: { [ACCOUNT]: workspace(ACCOUNT, 'new-plan', null, null) } }) }).check(requestInput());
+  assert.equal(unknown.selected.status, 'unknown');
+  assert.equal(createEligibilityStore().issue(unknown, ACCOUNT), null);
+
+  const malformed = await createSubscriptionChecker({ now: () => REFERENCE_TIME, fetchImpl: async () => json({ accounts: { [ACCOUNT]: { account: { account_id: ACCOUNT } } } }) }).check(requestInput());
+  assert.equal(malformed.selected, null);
+  assert.equal(malformed.checks[0].code, 'CHECK_RESPONSE_UNKNOWN');
+
+  const inaccessible = await createSubscriptionChecker({ now: () => REFERENCE_TIME, fetchImpl: async () => json({ accounts: { [TEAM]: workspace(TEAM, 'business') } }) }).check(requestInput());
+  assert.equal(inaccessible.credentialState, 'accepted');
+  assert.equal(inaccessible.selected, null);
+  assert.equal(inaccessible.checks[0].code, 'WORKSPACE_NOT_ACCESSIBLE');
 });
 
-test('conflicting current plan records yield an explicit unknown outcome', async () => {
-  const checker = createSubscriptionChecker({ now: () => REFERENCE_TIME, fetchImpl: async url => new URL(url).pathname.includes('accounts/check')
-    ? json({ accounts: { [ACCOUNT]: workspace(ACCOUNT, 'free', false, null) } })
-    : json({ plan_type: 'plus', active_until: '2026-10-30T18:52:44Z' }) });
+test('conflicting duplicate account records yield an explicit unknown outcome', async () => {
+  const checker = createSubscriptionChecker({ now: () => REFERENCE_TIME, fetchImpl: async () => json({ accounts: [
+    workspace(ACCOUNT, 'free', false, null),
+    workspace(ACCOUNT, 'plus', true, '2026-10-30T18:52:44Z'),
+  ] }) });
   const result = await checker.check(requestInput());
   assert.equal(result.selected.status, 'unknown');
   assert.equal(result.selected.plan, null);
-  assert.equal(result.checks.at(-1).code, 'SUBSCRIPTION_RECORDS_DIFFER');
+  assert.equal(result.workspaceCoverage, 'partial');
+  assert.equal(createEligibilityStore().issue(result, ACCOUNT), null);
 });
 
 test('expired personal paid records become current Free, while a future paid period remains active', async () => {
   for (const [end, plan, state] of [['2026-09-30T12:52:44Z', 'free', 'free'], ['2026-10-30T12:52:44Z', 'plus', 'active']]) {
-    const checker = createSubscriptionChecker({ now: () => REFERENCE_TIME, fetchImpl: async url => new URL(url).pathname.includes('accounts/check')
-      ? json({}, 403) : json({ structure: 'personal', plan_type: 'plus', active_until: end, will_renew: false }) });
+    const checker = createSubscriptionChecker({ now: () => REFERENCE_TIME, fetchImpl: async () => json({ accounts: {
+      [ACCOUNT]: workspace(ACCOUNT, 'plus', state === 'active', end),
+    } }) });
     const result = await checker.check(requestInput());
     assert.equal(result.selected.plan, plan);
     assert.equal(result.selected.status, state);
-    assert.equal(result.selected.willRenew, false);
-    assert.equal(result.workspaceCoverage, 'unavailable');
+    assert.equal(result.workspaceCoverage, 'complete');
     if (state === 'free') assert.ok(createEligibilityStore().issue(result, ACCOUNT));
   }
 });
 
-test('a current Free token resolves a stale inactive Plus record, but never overrides active Plus', async () => {
-  for (const [end, expectedPlan, expectedStatus] of [
-    ['2026-09-30T12:52:44Z', 'free', 'free'],
-    ['2026-10-30T12:52:44Z', 'plus', 'active'],
+test('a current Free token never overrides an online active Plus record', async () => {
+  for (const [end, active, expectedPlan, expectedStatus] of [
+    ['2026-09-30T12:52:44Z', false, 'free', 'free'],
+    ['2026-10-30T12:52:44Z', true, 'plus', 'active'],
   ]) {
-    const checker = createSubscriptionChecker({ now: () => REFERENCE_TIME, fetchImpl: async url => new URL(url).pathname.includes('accounts/check')
-      ? json({}, 403) : json({ plan_type: 'plus', active_until: end, will_renew: false }) });
+    const checker = createSubscriptionChecker({ now: () => REFERENCE_TIME, fetchImpl: async () => json({ accounts: {
+      [ACCOUNT]: workspace(ACCOUNT, 'plus', active, end),
+    } }) });
     const result = await checker.check(requestInput(ACCOUNT, 'free'));
     assert.equal(result.selected.plan, expectedPlan);
     assert.equal(result.selected.status, expectedStatus);
-    if (expectedStatus === 'free') {
-      assert.equal(result.selected.scope, 'personal');
-      assert.ok(createEligibilityStore().issue(result, ACCOUNT));
-    }
+    if (expectedStatus === 'free') assert.ok(createEligibilityStore().issue(result, ACCOUNT));
   }
 });
 
 test('an explicitly inactive personal Plus workspace is current Free, but inactive Business stays a workspace plan', async () => {
-  const checker = createSubscriptionChecker({ now: () => REFERENCE_TIME, fetchImpl: async url => {
-    if (new URL(url).pathname.includes('accounts/check')) return json({ accounts: {
-      [ACCOUNT]: workspace(ACCOUNT, 'plus', false, '2026-09-30T12:52:44Z'),
-      [TEAM]: workspace(TEAM, 'business', false, '2026-09-30T12:52:44Z'),
-    } });
-    return json({}, 403);
-  } });
+  const checker = createSubscriptionChecker({ now: () => REFERENCE_TIME, fetchImpl: async () => json({ accounts: {
+    [ACCOUNT]: workspace(ACCOUNT, 'plus', false, '2026-09-30T12:52:44Z'),
+    [TEAM]: workspace(TEAM, 'business', false, '2026-09-30T12:52:44Z'),
+  } }) });
   const personal = await checker.check(requestInput());
   assert.equal(personal.selected.plan, 'free');
   assert.equal(personal.selected.status, 'free');
@@ -236,34 +244,54 @@ test('an explicitly inactive personal Plus workspace is current Free, but inacti
   assert.equal(team.selected.scope, 'workspace');
 });
 
-test('same-account online dates are not resolved by blindly choosing the larger date', async () => {
-  const checker = createSubscriptionChecker({ now: () => REFERENCE_TIME, fetchImpl: async url => new URL(url).pathname.includes('accounts/check')
-    ? json({ accounts: { [ACCOUNT]: workspace(ACCOUNT, 'plus', true, '2026-11-30T12:00:00Z') } })
-    : json({ plan_type: 'plus', active_until: '2026-10-30T12:00:00Z' }) });
+test('duplicate account dates are not resolved by blindly choosing the larger date', async () => {
+  const checker = createSubscriptionChecker({ now: () => REFERENCE_TIME, fetchImpl: async () => json({ accounts: [
+    workspace(ACCOUNT, 'plus', true, '2026-11-30T12:00:00Z'),
+    workspace(ACCOUNT, 'plus', true, '2026-10-30T12:00:00Z'),
+  ] }) });
   const result = await checker.check(requestInput());
-  assert.equal(result.selected.status, 'active');
+  assert.equal(result.selected.status, 'unknown');
+  assert.equal(result.selected.plan, null);
   assert.equal(result.selected.periodEnd, null);
-  assert.equal(result.checks.at(-1).code, 'SUBSCRIPTION_DATES_DIFFER');
+  assert.equal(result.workspaceCoverage, 'partial');
+});
+
+test('a transient account-check failure is retried and still issues a Free-account capability', async () => {
+  let attempts = 0;
+  const checker = createSubscriptionChecker({ now: () => REFERENCE_TIME, fetchImpl: async url => {
+    assert.ok(new URL(url).pathname.includes('accounts/check'));
+    attempts++;
+    return attempts === 1 ? json({}, 503) : json({ accounts: { [ACCOUNT]: workspace(ACCOUNT, 'free', false, null) } });
+  } });
+  const result = await checker.check(requestInput(ACCOUNT, 'free'));
+  assert.equal(attempts, 2);
+  assert.equal(result.selected.plan, 'free');
+  assert.equal(result.selected.status, 'free');
+  assert.deepEqual(result.checks.map(check => [check.source, check.code]), [['live_workspace', 'OK']]);
+  assert.ok(createEligibilityStore().issue(result, ACCOUNT));
 });
 
 test('network, challenge, 401, 403, 429, invalid JSON and oversized responses remain unknown', async t => {
   const cases = [
-    ['401', () => json({ secret: 'do-not-leak' }, 401), 'CREDENTIAL_REJECTED'],
-    ['403', () => json({}, 403), 'ACCESS_RESTRICTED'],
-    ['429', () => json({}, 429), 'CHECK_RATE_LIMITED'],
-    ['500', () => json({}, 500), 'CHECK_UNAVAILABLE'],
-    ['html', () => new Response('<script>do-not-leak</script>', { headers: { 'content-type': 'text/html' } }), 'CHECK_RESPONSE_UNKNOWN'],
-    ['invalid-json', () => new Response('{do-not-leak', { headers: { 'content-type': 'application/json' } }), 'CHECK_RESPONSE_UNKNOWN'],
-    ['too-large', () => json({ private: 'x'.repeat(600_000) }), 'CHECK_RESPONSE_UNKNOWN'],
-    ['network', () => { throw new Error('do-not-leak'); }, 'CHECK_UNAVAILABLE'],
-    ['timeout', () => { throw new DOMException('do-not-leak', 'TimeoutError'); }, 'CHECK_TIMEOUT'],
+    ['401', () => json({ secret: 'do-not-leak' }, 401), 'CREDENTIAL_REJECTED', 1],
+    ['403', () => json({}, 403), 'ACCESS_RESTRICTED', 1],
+    ['408', () => json({}, 408), 'CHECK_UNAVAILABLE', 2],
+    ['429', () => json({}, 429), 'CHECK_RATE_LIMITED', 1],
+    ['500', () => json({}, 500), 'CHECK_UNAVAILABLE', 2],
+    ['html', () => new Response('<script>do-not-leak</script>', { headers: { 'content-type': 'text/html' } }), 'CHECK_RESPONSE_UNKNOWN', 1],
+    ['invalid-json', () => new Response('{do-not-leak', { headers: { 'content-type': 'application/json' } }), 'CHECK_RESPONSE_UNKNOWN', 1],
+    ['too-large', () => json({ private: 'x'.repeat(600_000) }), 'CHECK_RESPONSE_UNKNOWN', 1],
+    ['network', () => { throw new Error('do-not-leak'); }, 'CHECK_UNAVAILABLE', 2],
+    ['timeout', () => { throw new DOMException('do-not-leak', 'TimeoutError'); }, 'CHECK_TIMEOUT', 2],
   ];
-  for (const [name, fetchImpl, code] of cases) await t.test(name, async () => {
-    const result = await createSubscriptionChecker({ now: () => REFERENCE_TIME, fetchImpl }).check(requestInput());
+  for (const [name, fetchImpl, code, expectedAttempts] of cases) await t.test(name, async () => {
+    let attempts = 0;
+    const result = await createSubscriptionChecker({ now: () => REFERENCE_TIME, fetchImpl: (...args) => { attempts++; return fetchImpl(...args); } }).check(requestInput());
     assert.equal(result.selected, null);
     assert.equal(result.workspaceCoverage, 'unavailable');
     assert.equal(result.checks[0].code, code);
     assert.equal(result.credentialState, code === 'CREDENTIAL_REJECTED' ? 'rejected' : 'unconfirmed');
+    assert.equal(attempts, expectedAttempts);
     assert.doesNotMatch(JSON.stringify(result), /do-not-leak|synthetic_signature/);
   });
 });

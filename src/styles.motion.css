@@ -99,8 +99,9 @@
 .icon-button:active,
 .language-button:active { transform: scale(0.94); }
 
-/* 顶栏加一层很浅的投影，滚动时和内容分层 */
-.site-header { box-shadow: var(--shadow-sm); }
+/* 顶栏投影挂在胶囊 .header-content 上（见 styles.css）。
+   整条 header 现在是透明的，再给它加投影会变成一条悬空的黑带。 */
+.header-content { transition: box-shadow 200ms, border-color 200ms; }
 
 /* ------------------------------------------------------ 无障碍：动效降级 */
 
