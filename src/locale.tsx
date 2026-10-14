@@ -6,14 +6,14 @@ const zh = {
   support: '售后群', store: '冰云小店', email: '联系邮箱',
   home: '返回充值', nav: '主导航', menu: '菜单', light: '切换浅色模式', dark: '切换深色模式', language: 'Switch to English',
   skip: '跳转到主要内容', title: 'ChatGPT 自助充值', heroTitle: 'ChatGPT 自助充值', subtitle: '简单几步，为你的灵感续航。',
-  servicePromises: '服务承诺', officialChannel: 'ChatGPT官方渠道充值', visaFunds: '正规VISA资金', laborOnly: '只收取人工费', fastService: '快速处理', refund: '失败可退', encrypted: '数据加密传输',
+  servicePromises: '服务承诺', officialChannel: 'ChatGPT官方渠道充值', visaFunds: '正规VISA资金', laborOnly: '只收取人工费', fastService: '快速处理', encrypted: '数据加密传输',
 
   // Hero
   heroBadge: '官方渠道 · 人工代充',
-  heroLead: '为个人 ChatGPT 账号充值 Plus / Pro，正规资金、只收人工费，全程加密，失败可退。',
+  heroLead: '为个人 ChatGPT 账号充值 Plus / Pro，正规资金、只收人工费，全程加密。',
   heroPoint1: '个人 Free 账号可用',
   heroPoint2: '正规 VISA 资金',
-  heroPoint3: '失败可退 · 加密传输',
+  heroPoint3: '加密传输',
   ctaStart: '开始充值',
   ctaBuy: '文档教程',
   ctaSupport: '联系售后',
@@ -29,12 +29,12 @@ const zh = {
 
   // Guarantees
   guaranteesTitle: '为什么选择 AI代充',
-  guaranteesSubtitle: '六项服务承诺，写在这里，也落实在每一步流程里。',
+  guaranteesSubtitle: '多项服务承诺，写在这里，也落实在每一步流程里。',
   officialChannelDesc: '通过官方渠道完成订阅充值，不涉及共享账号，账号始终由你本人持有。',
   visaFundsDesc: '使用正规 VISA 卡通道付款，资金来源清晰可查，不做来路不明的低价交易。',
   laborOnlyDesc: '价格透明，仅收取服务人工费，没有隐藏费用，下单前就能看清总价。',
   fastServiceDesc: '提交后尽快安排处理，进度可在「订单查询」中随时跟踪。',
-  refundDesc: '若充值未能完成，按承诺退款到原支付方式，不让你的钱打水漂。',
+  refundDesc: '遇到异常时请联系售后，我们会根据订单状态协助处理。',
   encryptedDesc: '全程 HTTPS 加密传输，登录资料仅用于本次订阅检查，用完即清。',
 
   // Process
@@ -58,10 +58,10 @@ const zh = {
   faq4q: '充值需要多久完成？',
   faq4a: '提交后我们会尽快安排处理。你可以在「订单查询」中输入原卡密，随时查看订单状态与完成时间。',
   faq5q: '如果充值失败怎么办？',
-  faq5a: '若未能完成充值，将按服务承诺退款。遇到任何问题都可以加入售后群，我们会协助你处理。',
+  faq5a: '若充值未能完成，请加入售后群并提供原卡密，我们会根据订单状态协助处理。',
 
   // Footer
-  footerAbout: '面向个人 ChatGPT 账号的自助充值服务，正规资金、人工处理、失败可退。',
+  footerAbout: '面向个人 ChatGPT 账号的自助充值服务，正规资金、人工处理。',
   footerService: '服务',
   footerHelp: '支持',
   footerContact: '联系方式',
@@ -107,13 +107,13 @@ const en: Record<keyof typeof zh, string> = {
   support: 'Support', store: 'Store', email: 'Email',
   home: 'Back to top-up', nav: 'Main navigation', menu: 'Menu', light: 'Switch to light mode', dark: 'Switch to dark mode', language: '切换中文',
   skip: 'Skip to content', title: 'ChatGPT, topped up.', heroTitle: 'ChatGPT Self-Service Top-Up', subtitle: 'A few simple steps. More room for inspiration.',
-  servicePromises: 'Our service commitments', officialChannel: 'ChatGPT official-channel top-ups', visaFunds: 'Legitimate VISA payments', laborOnly: 'Service fee only', fastService: 'Fast processing', refund: 'Refund if unsuccessful', encrypted: 'Encrypted data transfer',
+  servicePromises: 'Our service commitments', officialChannel: 'ChatGPT official-channel top-ups', visaFunds: 'Legitimate VISA payments', laborOnly: 'Service fee only', fastService: 'Fast processing', encrypted: 'Encrypted data transfer',
 
   heroBadge: 'Official channel · Manual top-up',
-  heroLead: 'Top up Plus or Pro for your personal ChatGPT account — legitimate funds, service fee only, fully encrypted, refunded if unsuccessful.',
+  heroLead: 'Top up Plus or Pro for your personal ChatGPT account — legitimate funds, service fee only, fully encrypted.',
   heroPoint1: 'Works with personal Free accounts',
   heroPoint2: 'Legitimate VISA payments',
-  heroPoint3: 'Refundable · Encrypted',
+  heroPoint3: 'Encrypted transfer',
   ctaStart: 'Start now',
   ctaBuy: 'Docs',
   ctaSupport: 'Contact support',
@@ -127,12 +127,12 @@ const en: Record<keyof typeof zh, string> = {
   taskSubtitle: 'Check the subscription, then verify your code — it takes about two minutes.',
 
   guaranteesTitle: 'Why choose AITop-Up',
-  guaranteesSubtitle: 'Six commitments we make, and keep at every step of the flow.',
+  guaranteesSubtitle: 'Service commitments we apply throughout the flow.',
   officialChannelDesc: 'Top-ups go through the official channel. No shared accounts — the account always stays yours.',
   visaFundsDesc: 'Payment runs through legitimate VISA channels, with a clear and traceable source of funds.',
   laborOnlyDesc: 'Transparent pricing: a service fee only, no hidden charges. You see the full amount before ordering.',
   fastServiceDesc: 'We handle your request as soon as it is submitted, and you can track progress under Orders.',
-  refundDesc: 'If the top-up cannot be completed, we refund to your original payment method as promised.',
+  refundDesc: 'If an issue occurs, contact support and we will assist based on the order status.',
   encryptedDesc: 'Everything travels over HTTPS. Login details are used only for this check and cleared afterwards.',
 
   processTitle: 'How it works',
@@ -154,9 +154,9 @@ const en: Record<keyof typeof zh, string> = {
   faq4q: 'How long does the top-up take?',
   faq4a: 'We handle it as soon as it is submitted. Enter your code under Orders at any time to see the status and completion time.',
   faq5q: 'What if the top-up fails?',
-  faq5a: 'If it cannot be completed, we refund as promised. If you run into any issue, join the support group and we will help you sort it out.',
+  faq5a: 'If the top-up cannot be completed, join the support group with your original code so we can check the order and assist.',
 
-  footerAbout: 'Self-service top-ups for personal ChatGPT accounts — legitimate funds, manual handling, refunded if unsuccessful.',
+  footerAbout: 'Self-service top-ups for personal ChatGPT accounts — legitimate funds and manual handling.',
   footerService: 'Service',
   footerHelp: 'Support',
   footerContact: 'Contact',

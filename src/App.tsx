@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import {
   BadgeCheck, BadgeDollarSign, Ban, Check, ChevronDown, CircleCheck, CircleX, Clock3, CreditCard, HandCoins, Headphones, Info,
-  Languages, LoaderCircle, LockKeyhole, MapPin, Moon, Repeat2, RotateCcw, Search, ShieldCheck, Sun,
+  Languages, LoaderCircle, LockKeyhole, MapPin, Moon, Repeat2, Search, ShieldCheck, Sun,
   TriangleAlert,
 } from 'lucide-react';
 import CardField from './CardField';
@@ -42,7 +42,6 @@ const heroChips = [
   [CreditCard, '正规VISA资金', 'Legit VISA funds'],
   [HandCoins, '只收人工费', 'Service fee only'],
   [LockKeyhole, '数据加密传输', 'Encrypted transfer'],
-  [RotateCcw, '失败可退', 'Refund on failure'],
   [BadgeDollarSign, 'Plus ￥125', 'Plus ￥125'],
   [BadgeDollarSign, 'Pro 5x ￥700', 'Pro 5x ￥700'],
   [BadgeDollarSign, 'Pro 20x ￥1100', 'Pro 20x ￥1100'],
