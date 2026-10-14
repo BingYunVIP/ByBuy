@@ -60,13 +60,24 @@ ByBuy 是 **AI代充** 的 ChatGPT 自助充值前后端项目：浏览器提交
 ## 一键部署
 
 ```bash
-git clone git@github.com:BingYunVIP/ByBuy.git
+git clone https://github.com/BingYunVIP/ByBuy.git
 cd ByBuy
 chmod +x ByBuy.sh
 ./ByBuy.sh
 ```
 
-`ByBuy.sh` 会依次完成：
+脚本会显示管理菜单：
+
+```text
+1. 安装 / 重新部署
+2. 更新到最新版本
+3. 重启服务
+4. 查看服务状态
+5. 查看最近日志
+0. 退出
+```
+
+首次部署选择 `1`。`ByBuy.sh` 会依次完成：
 
 1. 检查并补齐基础工具（curl / tar / xz / ss / ip 等），必要时调用系统包管理器安装。
 2. 检测 Node.js 版本；低于 24.5.0 时下载官方 v24 二进制（带 SHA-256 校验）到 `.runtime/node`。
@@ -75,13 +86,6 @@ chmod +x ByBuy.sh
 5. 安装依赖、运行单元测试、生成生产构建。
 6. 默认安装并启动 `bybuy.service`；系统未使用 systemd 时自动回退为后台进程。
 7. 健康检查通过后打印实际监听地址与日志查看命令。
-
-跳过 systemd 询问：
-
-```bash
-BYBUY_ENABLE_SERVICE=1 ./ByBuy.sh   # 使用 systemd
-BYBUY_ENABLE_SERVICE=0 ./ByBuy.sh   # 使用后台进程
-```
 
 ## 配置
 
@@ -136,34 +140,41 @@ systemctl reload caddy
 
 ## 更新
 
-更新即重新跑一遍 `ByBuy.sh`：脚本会先停掉旧进程，再重新安装依赖、跑测试、构建并启动，
-端口与 `.env` 保持不变。
+进入项目目录并打开菜单：
 
 ```bash
-cd /root/ByBuy          # 换成你的实际目录
-git pull --ff-only
+cd /root/ByBuy
 ./ByBuy.sh
 ```
 
-只想更新代码、暂不重启时，可以只拉取并构建，重启留给合适的时机：
+选择 `2. 更新到最新版本`。脚本会自动：
+
+1. 检查并下载 GitHub 最新代码。
+2. 保护 `.env`、日志和运行数据。
+3. 发现本地文件修改时停止覆盖；如果只修改过 `ByBuy.sh`，会先备份并询问是否替换。
+4. 运行测试和生产构建。
+5. 保持原端口并重启服务。
+6. 执行健康检查并显示结果。
+
+从旧版脚本首次切换到管理菜单时，在项目目录执行一次：
 
 ```bash
-git pull --ff-only
-npm ci && npm test && npm run build
-sudo systemctl restart bybuy
+bash <(curl -fsSL https://raw.githubusercontent.com/BingYunVIP/ByBuy/main/ByBuy.sh)
 ```
+
+然后选择 `2`。完成这一次切换后，后续始终只需要运行 `./ByBuy.sh`。
 
 ## 运维
 
-systemd 模式：
+运行管理菜单：
 
 ```bash
-systemctl status bybuy
-systemctl restart bybuy
-journalctl -u bybuy -f -o cat
+cd /root/ByBuy
+./ByBuy.sh
 ```
 
-后台进程模式：日志在 `logs/runtime.log`，PID 在 `run/bybuy.pid`。
+菜单可以直接完成重启、状态检查和日志查看。后台进程模式的日志位于 `logs/runtime.log`，
+PID 位于 `run/bybuy.pid`。
 
 安装日志写入 `logs/install-*.log`（每次运行一份）。应用日志按
 `LIFECYCLE`、`HTTP`、`SECURITY`、`SUBSCRIPTION`、`ORDER`、`REMOTE`、`HEALTH`、`ERROR` 分类。

@@ -2,7 +2,15 @@
 set -Eeuo pipefail
 umask 027
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_SOURCE="${BASH_SOURCE[0]:-}"
+if [[ -n "${BYBUY_ROOT:-}" ]]; then
+  ROOT="$(cd "$BYBUY_ROOT" && pwd)"
+elif [[ "$SCRIPT_SOURCE" == /dev/fd/* || "$SCRIPT_SOURCE" == /proc/self/fd/* || ! -f "$SCRIPT_SOURCE" ]]; then
+  ROOT="$(pwd)"
+else
+  ROOT="$(cd "$(dirname "$SCRIPT_SOURCE")" && pwd)"
+fi
+[[ -f "$ROOT/package.json" && -f "$ROOT/ByBuy.sh" ]] || { printf '请在 ByBuy 项目目录中运行此脚本。\n' >&2; exit 1; }
 LOG_DIR="$ROOT/logs"
 RUN_DIR="$ROOT/run"
 RUNTIME_DIR="$ROOT/.runtime"
@@ -76,7 +84,7 @@ detect_package_manager() {
 
 install_base_tools() {
   local missing=() command
-  for command in curl tar xz sha256sum ss ip awk sed install; do
+  for command in curl git tar xz sha256sum ss ip awk sed install; do
     command -v "$command" >/dev/null 2>&1 || missing+=("$command")
   done
   if [[ ${#missing[@]} -eq 0 ]]; then
@@ -90,14 +98,14 @@ install_base_tools() {
   case "$PKG_MANAGER" in
     apt)
       if [[ $PKG_UPDATED -eq 0 ]]; then as_root apt-get update; PKG_UPDATED=1; fi
-      as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y curl ca-certificates xz-utils tar iproute2 coreutils
+      as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y curl git ca-certificates xz-utils tar iproute2 coreutils
       ;;
-    dnf) as_root dnf install -y curl ca-certificates xz tar iproute coreutils ;;
-    yum) as_root yum install -y curl ca-certificates xz tar iproute coreutils ;;
-    pacman) as_root pacman -Sy --noconfirm curl ca-certificates xz tar iproute2 coreutils ;;
-    zypper) as_root zypper --non-interactive install curl ca-certificates xz tar iproute2 coreutils ;;
+    dnf) as_root dnf install -y curl git ca-certificates xz tar iproute coreutils ;;
+    yum) as_root yum install -y curl git ca-certificates xz tar iproute coreutils ;;
+    pacman) as_root pacman -Sy --noconfirm curl git ca-certificates xz tar iproute2 coreutils ;;
+    zypper) as_root zypper --non-interactive install curl git ca-certificates xz tar iproute2 coreutils ;;
   esac
-  for command in curl tar xz sha256sum ss ip install; do command -v "$command" >/dev/null 2>&1 || die "自动安装后仍缺少 $command。"; done
+  for command in curl git tar xz sha256sum ss ip install; do command -v "$command" >/dev/null 2>&1 || die "自动安装后仍缺少 $command。"; done
   log OK DEPENDENCY "基础工具安装完成。"
 }
 
@@ -357,7 +365,131 @@ print_addresses() {
   log INFO NETWORK "域名绑定与 HTTPS 证书不由本脚本处理；请将反向代理指向 127.0.0.1:$PORT。"
 }
 
-main() {
+systemd_unit_exists() {
+  systemd_available && systemctl cat "$SERVICE_NAME.service" >/dev/null 2>&1
+}
+
+configured_port() {
+  local port
+  port="$(get_env PORT)"
+  [[ "$port" =~ ^[0-9]+$ ]] && (( port >= 1 && port <= 65535 )) || port=2254
+  printf '%s\n' "$port"
+}
+
+deployment_mode() {
+  if systemd_unit_exists; then
+    printf '1\n'
+  elif [[ -f "$RUN_DIR/bybuy.pid" ]] && kill -0 "$(cat "$RUN_DIR/bybuy.pid" 2>/dev/null || true)" 2>/dev/null; then
+    printf '0\n'
+  else
+    printf 'ask\n'
+  fi
+}
+
+show_status() {
+  cd "$ROOT"
+  local port pid
+  port="$(configured_port)"
+  if systemd_unit_exists; then
+    as_root systemctl status "$SERVICE_NAME.service" --no-pager || true
+  elif [[ -f "$RUN_DIR/bybuy.pid" ]]; then
+    pid="$(cat "$RUN_DIR/bybuy.pid" 2>/dev/null || true)"
+    if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+      log OK SERVICE "后台进程正在运行，PID=$pid。"
+    else
+      log WARN SERVICE "PID 文件存在，但后台进程未运行。"
+    fi
+  else
+    log WARN SERVICE "尚未发现 ByBuy 服务，请先选择“安装 / 重新部署”。"
+  fi
+  if command -v curl >/dev/null 2>&1 && curl -fsS --max-time 3 "http://127.0.0.1:$port/api/health" >/dev/null 2>&1; then
+    log OK HEALTH "健康检查通过：http://127.0.0.1:$port"
+  else
+    log WARN HEALTH "健康检查未通过：http://127.0.0.1:$port"
+  fi
+}
+
+restart_project() {
+  cd "$ROOT"
+  PORT="$(configured_port)"
+  if systemd_unit_exists; then
+    as_root systemctl restart "$SERVICE_NAME.service"
+    LOG_COMMAND="journalctl -u $SERVICE_NAME -f -o cat"
+    log OK SERVICE "systemd 服务已重启。"
+  else
+    install_base_tools
+    select_node
+    prepare_env
+    start_background
+  fi
+  wait_for_health
+}
+
+show_recent_logs() {
+  cd "$ROOT"
+  if systemd_unit_exists; then
+    as_root journalctl -u "$SERVICE_NAME" -n 100 --no-pager -o cat || true
+  elif [[ -f "$LOG_DIR/runtime.log" ]]; then
+    tail -n 100 "$LOG_DIR/runtime.log"
+  else
+    log WARN LOG "尚未找到应用日志。"
+  fi
+}
+
+update_project() {
+  cd "$ROOT"
+  install_base_tools
+  [[ -d "$ROOT/.git" ]] || die "当前目录不是 Git 项目，无法自动更新。"
+  [[ "$(git branch --show-current)" == main ]] || die "自动更新仅支持 main 分支。"
+  git remote get-url origin >/dev/null 2>&1 || die "未找到 origin 远程仓库。"
+
+  log INFO UPDATE "正在检查 GitHub 最新版本。"
+  git fetch --prune origin main
+  local remote_commit current_commit dirty path backup work_blob remote_blob mode
+  remote_commit="$(git rev-parse origin/main)"
+  current_commit="$(git rev-parse HEAD)"
+  dirty="$(git status --porcelain --untracked-files=all)"
+
+  if [[ -n "$dirty" ]]; then
+    path="${dirty:3}"
+    if [[ "$dirty" != *$'\n'* && "$path" == "ByBuy.sh" ]]; then
+      backup="$RUN_DIR/ByBuy.sh.before-update-$(date +%Y%m%d-%H%M%S)"
+      cp -p "$ROOT/ByBuy.sh" "$backup"
+      work_blob="$(git hash-object "$ROOT/ByBuy.sh")"
+      remote_blob="$(git rev-parse origin/main:ByBuy.sh 2>/dev/null || true)"
+      if [[ "$work_blob" != "$remote_blob" ]]; then
+        if [[ ! -t 0 ]]; then
+          die "ByBuy.sh 有本地修改，已备份到 $backup；请在交互终端中确认更新。"
+        fi
+        if ! ask_yes_no "检测到 ByBuy.sh 有本地修改，已备份。是否使用 GitHub 最新脚本继续更新？" Y; then
+          log WARN UPDATE "已取消更新，本地脚本备份：$backup"
+          return
+        fi
+      else
+        log INFO UPDATE "检测到用于启动菜单的新版脚本，已准备接管仓库版本。"
+      fi
+      git restore --source=HEAD --staged --worktree -- ByBuy.sh
+    else
+      log ERROR UPDATE "项目中存在未保存的本地修改，为避免覆盖，已停止更新："
+      printf '%s\n' "$dirty"
+      log INFO UPDATE "请先联系维护人员处理这些修改，再从菜单更新。"
+      return
+    fi
+  fi
+
+  if [[ "$current_commit" == "$remote_commit" ]]; then
+    log OK UPDATE "当前已经是最新版本。"
+    return
+  fi
+  git merge-base --is-ancestor HEAD origin/main || die "本地提交与 GitHub 已分叉，无法自动快进更新。"
+  mode="$(deployment_mode)"
+  git merge --ff-only origin/main
+  chmod +x "$ROOT/ByBuy.sh"
+  log OK UPDATE "代码更新完成，正在自动测试、构建并重启服务。"
+  exec env BYBUY_ACTION=deploy BYBUY_ENABLE_SERVICE="$mode" "$ROOT/ByBuy.sh"
+}
+
+deploy_project() {
   [[ "$(uname -s)" == Linux ]] || die "ByBuy.sh 目前只支持 Linux。"
   cd "$ROOT"
   log INFO SYSTEM "项目目录：$ROOT"
@@ -400,6 +532,62 @@ main() {
   log INFO LOG "应用日志分类：LIFECYCLE / HTTP / SECURITY / SUBSCRIPTION / ORDER / REMOTE / HEALTH / ERROR"
   log INFO LOG "实时查看：$LOG_COMMAND"
   log OK SYSTEM "ByBuy 部署完成。"
+}
+
+print_menu() {
+  printf '\n%s\n' '================ ByBuy 管理菜单 ================'
+  printf '%s\n' '  1. 安装 / 重新部署'
+  printf '%s\n' '  2. 更新到最新版本'
+  printf '%s\n' '  3. 重启服务'
+  printf '%s\n' '  4. 查看服务状态'
+  printf '%s\n' '  5. 查看最近日志'
+  printf '%s\n' '  0. 退出'
+  printf '%s\n' '================================================='
+}
+
+pause_menu() {
+  [[ -t 0 ]] && read -r -p "按 Enter 返回菜单..." _ || true
+}
+
+menu() {
+  local choice
+  while true; do
+    print_menu
+    read -r -p "请选择 [0-5]：" choice || return
+    case "$choice" in
+      1) deploy_project; pause_menu ;;
+      2) update_project; pause_menu ;;
+      3) restart_project; pause_menu ;;
+      4) show_status; pause_menu ;;
+      5) show_recent_logs; pause_menu ;;
+      0) log INFO SYSTEM "已退出。"; return ;;
+      *) log WARN SYSTEM "请输入 0 到 5。"; pause_menu ;;
+    esac
+  done
+}
+
+print_help() {
+  printf '%s\n' '用法：./ByBuy.sh'
+  printf '%s\n' '直接运行会打开管理菜单；通常不需要记忆其他命令。'
+}
+
+main() {
+  local action="${1:-${BYBUY_ACTION:-}}"
+  if [[ -z "$action" && -n "${BYBUY_ENABLE_SERVICE+x}" ]]; then action=deploy; fi
+  if [[ -z "$action" ]]; then
+    if [[ -t 0 ]]; then menu; else deploy_project; fi
+    return
+  fi
+  case "$action" in
+    menu) menu ;;
+    install|deploy) deploy_project ;;
+    update) update_project ;;
+    restart) restart_project ;;
+    status) show_status ;;
+    logs) show_recent_logs ;;
+    -h|--help|help) print_help ;;
+    *) die "未知操作：$action。直接运行 ./ByBuy.sh 使用菜单。" ;;
+  esac
 }
 
 main "$@"
