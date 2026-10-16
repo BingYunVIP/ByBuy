@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import {
   BadgeCheck, BadgeDollarSign, Ban, Check, ChevronDown, CircleCheck, CircleX, Clock3, CreditCard, HandCoins, Headphones, Info,
-  Languages, LoaderCircle, LockKeyhole, MapPin, Moon, Repeat2, Search, ShieldCheck, Sun,
+  Languages, LoaderCircle, LockKeyhole, Moon, Search, ShieldCheck, Sun,
   TriangleAlert,
 } from 'lucide-react';
 import CardField from './CardField';
@@ -36,21 +36,21 @@ const navLinks = [
   { key: 'email', href: `mailto:${EMAIL}`, icon: 'mail', external: false },
 ] as const;
 
-/* Hero 关键词胶囊：保持统一尺寸与现有动效，补充套餐、保障和地区信息。 */
-const heroChips = [
+/* Hero 关键词胶囊分两行：服务保障在上，套餐价格在下。 */
+const heroServiceChips = [
   [ShieldCheck, '官方渠道', 'Official channel'],
   [CreditCard, '正规VISA资金', 'Legit VISA funds'],
   [HandCoins, '只收人工费', 'Service fee only'],
   [LockKeyhole, '数据加密传输', 'Encrypted transfer'],
+  [BadgeCheck, '质保订阅一个月', 'One-month subscription warranty'],
+  [Headphones, '售后有保障', 'After-sales support'],
+] as const;
+
+const heroPriceChips = [
   [BadgeDollarSign, 'Plus ￥125', 'Plus ￥125'],
   [BadgeDollarSign, 'Pro 5x ￥700', 'Pro 5x ￥700'],
   [BadgeDollarSign, 'Pro 20x ￥1100', 'Pro 20x ￥1100'],
   [BadgeDollarSign, 'Pro 25x ￥3200', 'Pro 25x ￥3200'],
-  [Repeat2, '复购有优惠', 'Repeat-order discount'],
-  [BadgeCheck, '质保订阅一个月', 'One-month subscription warranty'],
-  [Headphones, '售后有保障', 'After-sales support'],
-  [MapPin, '菲律宾', 'Philippines'],
-  [MapPin, '智利', 'Chile'],
 ] as const;
 
 /* 注意事项。夹在引导条和充值卡之间 —— 提交前一定会看到。
@@ -310,22 +310,31 @@ function RechargePage({ onQuery }: { onQuery: (code: string) => void }) {
   /* 每次打开页面随机挑一个关键词胶囊放大，给首屏一个视觉焦点，
      也顺带让每次访问看起来不完全一样。
      用 useState 的惰性初始化，保证只在挂载时算一次 —— 重渲染时不会跳来跳去。 */
-  const [featured] = useState(() => Math.floor(Math.random() * heroChips.length));
+  const [featured] = useState(() => Math.floor(Math.random() * heroServiceChips.length));
   return <>
     <section className="hero hero--slim">
       <div className="container hero-slim">
         <h1 className="bb-rise">{t('heroTitle')}</h1>
-        <ul className="hero-chips">
-          {heroChips.map(([Icon, zh, en], index) => (
-            <li
-              key={zh}
-              className={index === featured ? 'bb-pop hero-chip--featured' : 'bb-pop'}
-              style={{ animationDelay: `${90 + index * 55}ms` }}
-            >
-              <Icon size={15} aria-hidden="true" />{lang === 'zh' ? zh : en}
-            </li>
-          ))}
-        </ul>
+        <div className="hero-chip-groups">
+          <ul className="hero-chips hero-chips--services">
+            {heroServiceChips.map(([Icon, zh, en], index) => (
+              <li
+                key={zh}
+                className={index === featured ? 'bb-pop hero-chip--featured' : 'bb-pop'}
+                style={{ animationDelay: `${90 + index * 55}ms` }}
+              >
+                <Icon size={15} aria-hidden="true" />{lang === 'zh' ? zh : en}
+              </li>
+            ))}
+          </ul>
+          <ul className="hero-chips hero-chips--prices">
+            {heroPriceChips.map(([Icon, zh, en], index) => (
+              <li key={zh} className="bb-pop" style={{ animationDelay: `${90 + (heroServiceChips.length + index) * 55}ms` }}>
+                <Icon size={15} aria-hidden="true" />{lang === 'zh' ? zh : en}
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
     </section>
 

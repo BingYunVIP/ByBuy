@@ -63,8 +63,14 @@ with sync_playwright() as p:
         expect(page.get_by_text('卡密即凭证，请勿泄露给他人。',exact=True)).to_be_visible()
         assert page.locator('.brand img').get_attribute('src')=='/logo.png'
         expect(page.get_by_role('link',name='AI代充',exact=True)).to_be_visible()
-        for promise in ['官方渠道','正规VISA资金','只收人工费','数据加密传输','Plus ￥125','Pro 5x ￥700','Pro 20x ￥1100','Pro 25x ￥3200','复购有优惠','质保订阅一个月','售后有保障','菲律宾','智利']:
+        services=['官方渠道','正规VISA资金','只收人工费','数据加密传输','质保订阅一个月','售后有保障']
+        prices=['Plus ￥125','Pro 5x ￥700','Pro 20x ￥1100','Pro 25x ￥3200']
+        assert page.locator('.hero-chips--services li').all_text_contents()==services
+        assert page.locator('.hero-chips--prices li').all_text_contents()==prices
+        for promise in services+prices:
             expect(page.get_by_text(promise,exact=True)).to_be_visible()
+        for removed in ['复购有优惠','菲律宾','智利']:
+            assert page.get_by_text(removed,exact=True).count()==0
         assert '失败'+'可退' not in page.locator('.hero-chips').all_text_contents()
         assert page.locator('.header-links > *').all_text_contents()==['订单查询','全球价格对比','AI 中转站','冰云小店','售后群','联系邮箱']
         for label,url in [('全球价格对比','https://appstoreprice.org/zh/apps/6448311069'),('AI 中转站','https://api.bingyun.vip'),('冰云小店','https://shop.bingyun.vip'),('售后群','https://qm.qq.com/q/6fuAq8mBwW')]:
@@ -109,8 +115,10 @@ with sync_playwright() as p:
         expect(page.locator('html')).to_have_attribute('lang','en')
         page.reload(wait_until='networkidle')
         expect(page.get_by_role('heading',name='ChatGPT Self-Service Top-Up',exact=True)).to_be_visible()
-        for promise in ['Repeat-order discount','One-month subscription warranty','Philippines','Chile']:
+        for promise in ['One-month subscription warranty','After-sales support','Plus ￥125','Pro 5x ￥700','Pro 20x ￥1100','Pro 25x ￥3200']:
             expect(page.get_by_text(promise,exact=True)).to_be_visible()
+        for removed in ['Repeat-order discount','Philippines','Chile']:
+            assert page.get_by_text(removed,exact=True).count()==0
         expect(page.locator('html')).to_have_attribute('data-theme','light')
         audit('light-english')
         page.get_by_role('button',name='切换中文',exact=True).click()

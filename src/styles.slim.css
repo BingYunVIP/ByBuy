@@ -33,6 +33,13 @@
   text-wrap: balance;
 }
 
+/* 两组各占一行：服务保障在上，套餐价格在下。 */
+.hero-chip-groups {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+}
+
 /* 关键词胶囊：图标用品牌色，整体是苹果 HIG 那种克制的圆角浅底 */
 .hero-chips {
   display: flex;
