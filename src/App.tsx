@@ -49,7 +49,7 @@ const heroServiceChips = [
 const heroPriceChips = [
   [BadgeDollarSign, 'Plus ￥125', 'Plus ￥125'],
   [BadgeDollarSign, 'Pro 5x ￥700', 'Pro 5x ￥700'],
-  [BadgeDollarSign, 'Pro 20x ￥1100', 'Pro 20x ￥1100'],
+  [BadgeDollarSign, 'Pro 10x ￥1100', 'Pro 10x ￥1100'],
   [BadgeDollarSign, 'Pro 25x ￥3200', 'Pro 25x ￥3200'],
 ] as const;
 
