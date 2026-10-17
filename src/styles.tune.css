@@ -318,3 +318,28 @@
   /* 关掉动效后，光环的"亮着"状态得补回来，否则放大后的胶囊会显得没描边 */
   .hero-slim .hero-chips li.hero-chip--featured::after { opacity: 0.6; }
 }
+
+/* ========================================== 引导条：👉 指示符 */
+
+/* 原来的数字圆圈换成 👉 并左右晃动，提示才明显。
+   去掉圆形底色，只保留 emoji；固定宽度避免晃动时挤动文字。 */
+.task-section .session-guide a > span.guide-pointer {
+  width: auto;
+  height: auto;
+  border-radius: 0;
+  background: none;
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+  font-size: 18px;
+  line-height: 1;
+  animation: guide-pointer-nudge 1s ease-in-out infinite;
+}
+@keyframes guide-pointer-nudge {
+  0%, 100% { transform: translateX(-3px); }
+  50% { transform: translateX(3px); }
+}
+@media (max-width: 640px) {
+  .task-section .session-guide a > span.guide-pointer { width: auto; height: auto; font-size: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .task-section .session-guide a > span.guide-pointer { animation: none; }
+}

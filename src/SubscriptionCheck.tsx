@@ -187,9 +187,9 @@ export default function SubscriptionCheck({ onQuery }: { onQuery: (code: string)
         {step === 1 ? <div className="step-pane" key="pane-1">
           <form onSubmit={event => { event.preventDefault(); void checkSubscription(); }} aria-busy={checking}>
             <div className="session-guide bb-rise" style={{ animationDelay: '140ms' }}>
-              <a href="https://chatgpt.com" target="_blank" rel="noopener noreferrer"><span>1</span>{t('guideLogin')}</a>
+              <a href="https://chatgpt.com" target="_blank" rel="noopener noreferrer"><span className="guide-pointer" aria-hidden="true">👉</span>{t('guideLogin')}</a>
               <span className="guide-divider" />
-              <a href="https://chatgpt.com/api/auth/session" target="_blank" rel="noopener noreferrer"><span>2</span>{t('guideSession')}</a>
+              <a href="https://chatgpt.com/api/auth/session" target="_blank" rel="noopener noreferrer"><span className="guide-pointer" aria-hidden="true">👉</span>{t('guideSession')}</a>
               <p>{t('guideNote')}</p>
             </div>
             <div className="form-label-row"><label htmlFor="session-json">{t('session')}</label><button className="text-button" type="button" disabled={Boolean(busy)} onClick={() => fileRef.current?.click()}><Upload size={14} />{t(busy === 'file' ? 'importing' : 'import')}</button></div>
