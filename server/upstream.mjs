@@ -1,4 +1,4 @@
-const PLANS = { plus: 'ChatGPT Plus', pro: 'ChatGPT Pro', go: 'ChatGPT Go', team: 'ChatGPT Team' };
+const PLANS = { go: 'ChatGPT Go', plus: 'ChatGPT Plus', pro: 'ChatGPT Pro' };
 const STATUSES = new Set(['PENDING', 'PROCESSING', 'COMPLETED', 'FAILED', 'CANCELLED', 'PLAN_MISMATCH', 'SUSPICIOUS', 'REQUIRES_NEW_SESSION']);
 const RECONCILABLE_STATUSES = new Set(['PENDING', 'PROCESSING', 'COMPLETED', 'SUSPICIOUS', 'REQUIRES_NEW_SESSION']);
 
@@ -26,9 +26,41 @@ export function readCard(body) {
   return code;
 }
 
+/* 充值服务把 Pro 按档位拆成 pro5 / pro / pro20 / pro25，本站统一只显示「Pro」，
+   所以卡密和订单对外只会出现 Go、Plus、Pro 三种名称。 */
 function planLabel(plan) {
   const key = typeof plan === 'string' ? plan.toLowerCase() : '';
-  return Object.hasOwn(PLANS, key) ? PLANS[key] : 'AI 订阅';
+  const family = /^pro\d*$/.test(key) ? 'pro' : key;
+  return Object.hasOwn(PLANS, family) ? PLANS[family] : 'AI 订阅';
+}
+
+/* 本站不出售续费卡和 Codex 点数卡。它们的结果含义和普通充值不同
+   （续费卡「完成」只是绑卡成功、等待自动扣费），按普通订单展示会误导顾客，
+   所以在验证和查询阶段就明确拒绝，不让它们走进充值流程。 */
+function isUnsupportedCard(data) {
+  const kind = `${data.cardType ?? ''} ${data.plan ?? ''}`.toUpperCase();
+  return Boolean(data.renewal) || /RENEWAL|CODEX/.test(kind);
+}
+
+function unsupportedCard() {
+  return new PublicError(400, 'UNSUPPORTED_CARD', '该类型卡密暂不支持在本站使用。');
+}
+
+/* 顾客安全验证的进度事件。浏览器和 API 层只认左边的短名字，
+   充值服务要求的事件名只存在于服务端。 */
+export const VERIFICATION_EVENTS = Object.freeze({
+  shown: 'CUSTOMER_VERIFICATION_MODAL_SHOWN',
+  started: 'CUSTOMER_VERIFICATION_STARTED',
+  succeeded: 'CUSTOMER_VERIFICATION_SUCCEEDED',
+  failed: 'CUSTOMER_VERIFICATION_FAILED',
+});
+
+export function readVerificationEvent(body) {
+  const invalid = () => new PublicError(400, 'INVALID_INPUT', '请求格式不正确，请刷新页面重试。');
+  if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some(key => !['code', 'event'].includes(key))) throw invalid();
+  const code = readCard({ code: body.code });
+  if (typeof body.event !== 'string' || !Object.hasOwn(VERIFICATION_EVENTS, body.event)) throw invalid();
+  return { code, event: body.event };
 }
 
 function maskEmail(email) {
@@ -207,7 +239,9 @@ export function createUpstream({
     }
   }
 
-  async function attempt(target, targetIndex, path, payload, action) {
+  /* bestEffort：只关心「有没有送到」，响应体不解析 —— 用于顾客进度事件，
+     2xx 就算成功，不要求返回格式固定。 */
+  async function attempt(target, targetIndex, path, payload, action, { bestEffort = false } = {}) {
     const started = performance.now();
     let response;
     try {
@@ -231,6 +265,11 @@ export function createUpstream({
       await response.body?.cancel();
       trace(action, targetIndex, { status: response.status, outcome: 'UNAVAILABLE', durationMs: Math.round(performance.now() - started) });
       throw new PublicError(502, 'SERVICE_UNAVAILABLE', '充值服务暂时不可用，请稍后重试。');
+    }
+    if (bestEffort && response.ok) {
+      await response.body?.cancel();
+      trace(action, targetIndex, { status: response.status, outcome: 'OK', durationMs: Math.round(performance.now() - started) });
+      return {};
     }
     const body = await readJson(response);
     const resultCode = typeof body.code === 'string' && /^[A-Z0-9_]{1,64}$/.test(body.code) ? body.code : 'UNKNOWN';
@@ -264,14 +303,14 @@ export function createUpstream({
     return new PublicError(502, 'SERVICE_UNAVAILABLE', '暂时无法连接充值服务，请稍后重试。');
   }
 
-  async function request(path, payload, action) {
+  async function request(path, payload, action, options) {
     /* 整次调用（含兜底重试）只占一个名额 —— 否则一个用户卡住会吃掉两个名额。 */
     await gate.acquire();
     try {
       let lastError = null;
       for (const [targetIndex, target] of targets.entries()) {
         try {
-          return await attempt(target, targetIndex, path, payload, action);
+          return await attempt(target, targetIndex, path, payload, action, options);
         } catch (error) {
           if (error instanceof PublicError && !RETRYABLE.has(error.code)) throw error;
           lastError = error;
@@ -345,13 +384,19 @@ export function createUpstream({
   return {
     async verify(code) {
       const data = await request('/api/public/cards/verify', { code }, 'verify');
+      if (isUnsupportedCard(data)) throw unsupportedCard();
       return { kind: 'card', valid: true, plan: planLabel(data.plan), status: 'AVAILABLE' };
     },
     async query(code) {
       const data = await request('/api/public/orders/query-by-card', { code }, 'query');
+      if (isUnsupportedCard(data)) throw unsupportedCard();
       // Deliberately select fields. Stripe action details are browser-scoped and allowlisted;
       // customerMessage, advertisements, contact details, Session and queryToken stay private.
       return normalizedOrder(data, true);
+    },
+    /* 只带卡密和事件名，不带 Session。事件是尽力而为：失败由调用方决定是否理会。 */
+    async recordVerificationEvent(code, event) {
+      await request('/api/public/orders/events', { code, eventType: VERIFICATION_EVENTS[event] }, 'verification-event', { bestEffort: true });
     },
     async submit({ code, sessionJson, contact = '', accountEmail }) {
       await gate.acquire();

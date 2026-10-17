@@ -87,7 +87,7 @@ const zh = {
   fileError: '文件读取失败，请重试。', next: '下一步：验证卡密', back: '重新检查账号',
   card: '兑换卡密', cardPlaceholder: '输入完整卡密', verify: '验证卡密', verifying: '正在验证…',
   cardReminder: '卡密即凭证，请勿泄露给他人', showCard: '显示卡密', hideCard: '隐藏卡密', paste: '粘贴',
-  pasteError: '请在输入框中手动粘贴。', cardInvalid: '请输入完整卡密。', cardUsed: '卡密无效或已使用。',
+  pasteError: '请在输入框中手动粘贴。', cardInvalid: '请输入完整卡密。', cardUsed: '卡密无效或已使用。', cardUnsupported: '该类型卡密暂不支持在本站使用。',
   cardPassed: '卡密验证通过', submissionSoon: '账号与卡密均已确认，可以完成提交。', notOpen: '暂未开放',
   sessionRequired: '完成充值需要从 ChatGPT 获取的完整 Session JSON，请重新导入后再继续。',
   submitOrder: '完成提交', submittingOrder: '正在提交…', submitted: '订单已提交', submittedPending: '充值请求已进入处理队列，可使用原卡密查询进度。',
@@ -182,7 +182,7 @@ const en: Record<keyof typeof zh, string> = {
   fileError: 'Unable to read the file. Please try again.', next: 'Next: verify code', back: 'Check another account',
   card: 'Redemption code', cardPlaceholder: 'Enter your full code', verify: 'Verify code', verifying: 'Verifying…',
   cardReminder: 'Your code is your proof of purchase. Keep it private.', showCard: 'Show code', hideCard: 'Hide code', paste: 'Paste',
-  pasteError: 'Please paste directly into the field.', cardInvalid: 'Please enter your full code.', cardUsed: 'This code is invalid or already used.',
+  pasteError: 'Please paste directly into the field.', cardInvalid: 'Please enter your full code.', cardUsed: 'This code is invalid or already used.', cardUnsupported: 'This type of code is not supported on this site.',
   cardPassed: 'Code verified', submissionSoon: 'Your account and code are confirmed. You can complete the submission.', notOpen: 'Not available yet',
   sessionRequired: 'A complete ChatGPT Session JSON is required to finish. Import it before continuing.',
   submitOrder: 'Complete submission', submittingOrder: 'Submitting…', submitted: 'Order submitted', submittedPending: 'Your request is in the processing queue. Use the original code to track it.',
@@ -234,6 +234,7 @@ export function errorKey(code?: string): CopyKey {
   if (code === 'PLAN_MISMATCH') return 'waitExpiry';
   if (['SUBMISSION_UNKNOWN', 'SUBMISSION_ALREADY_ATTEMPTED'].includes(code ?? '')) return 'submissionUnknown';
   if (code === 'INVALID_CARD') return 'cardUsed';
+  if (code === 'UNSUPPORTED_CARD') return 'cardUnsupported';
   if (code === 'ORDER_NOT_FOUND') return 'notFound';
   if (['RATE_LIMITED', 'SERVICE_BUSY', 'CHECK_RATE_LIMITED'].includes(code ?? '')) return 'rateLimited';
   if (['CREDENTIAL_REJECTED', 'CREDENTIAL_EXPIRED', 'CREDENTIAL_NOT_YET_VALID'].includes(code ?? '')) return 'expired';

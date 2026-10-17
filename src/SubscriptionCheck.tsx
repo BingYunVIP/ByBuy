@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, CircleCheck, FileJson, LoaderCircle, LockKeyhole, RefreshCw, Upload } from 'lucide-react';
 import { MAX_IMPORT_BYTES, parseSubscriptionInput, planLabel } from '../shared/subscription.ts';
 import type { LiveReport, ParsedAccount } from '../shared/subscription.ts';
-import { completeStripeVerification, requestCard, submitOrder } from './api';
+import { reportVerification, requestCard, runVerification, submitOrder } from './api';
 import type { CardResult, OrderResult, SubmissionResult } from './api';
 import CardField from './CardField';
 import { errorKey, useLocale } from './locale';
@@ -53,6 +53,10 @@ export default function SubscriptionCheck({ onQuery }: { onQuery: (code: string)
     const timeout = setTimeout(() => { setLive(value => value ? { ...value, eligibility: null } : null); setStep(1); setCard(null); setSubmission(null); setCode(''); setNotice('ticketExpired'); }, Math.max(0, remaining));
     return () => clearTimeout(timeout);
   }, [ticket]);
+
+  /* 验证提示出现时回报一次（同一份验证信息只报一次，去重在 reportVerification 里）。 */
+  const pendingVerification = submission?.verification ?? null;
+  useEffect(() => { if (pendingVerification) reportVerification(code.trim().toUpperCase(), 'shown', pendingVerification); }, [pendingVerification]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function cancel() { generation.current++; controller.current?.abort(); controller.current = null; setBusy(null); }
   function clearCredentials() { setDraft(''); setSessionJson(''); setAccounts([]); setSelected(0); setLive(null); if (fileRef.current) fileRef.current.value = ''; }
@@ -153,7 +157,7 @@ export default function SubscriptionCheck({ onQuery }: { onQuery: (code: string)
     if (!details || controller.current) return;
     const request = new AbortController(); controller.current = request; setBusy('verification'); setSubmissionNotice(null);
     try {
-      await completeStripeVerification(details);
+      await runVerification(code.trim().toUpperCase(), details);
       if (request.signal.aborted) return;
       await new Promise(resolve => setTimeout(resolve, 1000));
       const response = await requestCard('query', code.trim().toUpperCase(), request.signal);

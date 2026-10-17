@@ -1,6 +1,6 @@
 import express from 'express';
 import { randomUUID } from 'node:crypto';
-import { createUpstream, PublicError, readCard } from './upstream.mjs';
+import { createUpstream, PublicError, readCard, readVerificationEvent } from './upstream.mjs';
 import { createSubscriptionChecker, readSubscriptionInput } from './subscriptions.mjs';
 import { createEligibilityStore } from './eligibility.mjs';
 import { PROFILE_CLAIM, decodeJwt, parseSubscriptionInput, record, textValue } from '../shared/subscription.ts';
@@ -170,6 +170,16 @@ export function createApi({ upstream = createUpstream(), subscriptions = createS
       res.json({ ok: true, data, meta: { requestId: res.locals.requestId, durationMs: Math.round(performance.now() - res.locals.startedAt) } });
     });
   }
+
+  /* 顾客安全验证的进度（出现 / 开始 / 成功 / 失败），转交给充值服务。
+     只收卡密和固定的几个事件名；不需要资格凭证 —— 订单查询页同样会触发验证。 */
+  router.post('/orders/events', async (req, res) => {
+    if (!req.is('application/json')) throw new PublicError(415, 'INVALID_CONTENT_TYPE', '请求格式不正确，请刷新页面重试。');
+    const { code, event } = readVerificationEvent(req.body);
+    await upstream.recordVerificationEvent(code, event);
+    appLog.info('ORDER', 'VERIFICATION_EVENT', { requestId: res.locals.requestId, event });
+    res.json({ ok: true, data: { recorded: true }, meta: { requestId: res.locals.requestId, durationMs: Math.round(performance.now() - res.locals.startedAt) } });
+  });
 
   router.use((_req, _res, next) => next(new PublicError(404, 'NOT_FOUND', '此功能暂未开放。')));
   router.use((error, _req, res, _next) => {

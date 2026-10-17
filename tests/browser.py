@@ -35,6 +35,18 @@ with sync_playwright() as p:
     page.on('console', lambda message: console_messages.append(message.text))
     page.route('**/api/service/status', lambda route: route.fulfill(status=200, content_type='application/json', body=json.dumps({'ok': True, 'data': {'online': True, 'latencyMs': 20, 'cached': True}})))
 
+    events=[]
+    def record_event(route):
+        events.append(route.request.post_data_json)
+        route.fulfill(status=200,content_type='application/json',body=json.dumps({'ok':True,'data':{'recorded':True}}))
+    page.route('**/api/orders/events',record_event)
+
+    def wait_events(count):
+        for _ in range(100):
+            if len(events)>=count:return
+            page.wait_for_timeout(50)
+        raise AssertionError(f'expected {count} verification events, got {events}')
+
     def audit(label):
         page.evaluate((ROOT / 'node_modules/axe-core/axe.min.js').read_text())
         results = page.evaluate("async()=> (await axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}})).violations")
@@ -153,6 +165,11 @@ with sync_playwright() as p:
         page.get_by_role('button',name='显示卡密',exact=True).click()
         expect(page.get_by_label('兑换卡密',exact=True)).to_have_attribute('type','text')
         page.get_by_role('button',name='隐藏卡密',exact=True).click()
+        page.route('**/api/cards/verify',lambda route: route.fulfill(status=400,content_type='application/json',body=json.dumps({'ok':False,'error':{'code':'UNSUPPORTED_CARD','message':'unsupported','canQuery':False}})))
+        page.get_by_role('button',name='验证卡密',exact=True).click()
+        expect(page.get_by_text('该类型卡密暂不支持在本站使用。',exact=True)).to_be_visible()
+        expect(page.get_by_role('button',name='完成提交',exact=True)).to_have_count(0)
+        page.unroute('**/api/cards/verify')
         def verify(route):
             assert route.request.headers['x-bybuy-eligibility']=='browser-synthetic-ticket'
             assert route.request.post_data_json=={'code':'DEMO-TEST-CARD'}
@@ -174,6 +191,9 @@ with sync_playwright() as p:
         page.route('**/api/orders/query',lambda route: route.fulfill(status=200,content_type='application/json',body=json.dumps({'ok':True,'data':{'kind':'order','status':'COMPLETED','plan':'ChatGPT Plus','accountMasked':'s***@e***.test','orderNoMasked':'•••• 123456','createdAt':None,'processingAt':None,'completedAt':'2026-10-11T11:00:00Z','updatedAt':None,'requiresVerification':False}})))
         page.get_by_role('button',name='完成安全验证',exact=True).click()
         expect(page.get_by_role('heading',name='充值已完成',exact=True)).to_be_visible()
+        wait_events(3)
+        assert events==[{'code':'DEMO-TEST-CARD','event':name} for name in ('shown','started','succeeded')],events
+        events.clear()
         page.unroute('**/api/orders/query')
         expect(page.get_by_role('button',name='查询此卡密',exact=True)).to_be_visible()
         page.get_by_role('button',name='重新开始',exact=True).click()
@@ -193,9 +213,21 @@ with sync_playwright() as p:
         page.route('**/api/orders/query',query_order)
         page.get_by_role('button',name='查询订单',exact=True).click()
         expect(page.get_by_role('heading',name='等待处理',exact=True)).to_be_visible()
+        page.evaluate("window.Stripe=()=>({handleNextAction:async()=>({error:{message:'declined'}})})")
+        page.get_by_role('button',name='完成安全验证',exact=True).click()
+        expect(page.get_by_text('安全验证未完成，请稍后在订单查询中重试。',exact=True)).to_be_visible()
+        page.evaluate("window.Stripe=()=>({handleNextAction:async()=>({})})")
         page.get_by_role('button',name='完成安全验证',exact=True).click()
         expect(page.get_by_role('heading',name='充值已完成',exact=True)).to_be_visible()
+        wait_events(5)
+        assert [item['event'] for item in events]==['shown','started','failed','started','succeeded'],events
+        assert all(item=={'code':'DEMO-TEST-CARD','event':item['event']} for item in events),events
+        events.clear()
         audit('order')
+        page.unroute('**/api/orders/query')
+        page.route('**/api/orders/query',lambda route: route.fulfill(status=400,content_type='application/json',body=json.dumps({'ok':False,'error':{'code':'UNSUPPORTED_CARD','message':'unsupported','canQuery':False}})))
+        page.get_by_role('button',name='刷新状态',exact=True).click()
+        expect(page.get_by_text('该类型卡密暂不支持在本站使用。',exact=True)).to_be_visible()
         page.unroute('**/api/orders/query')
 
         # A superseded request must not unlock a new account or a new page.

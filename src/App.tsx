@@ -5,7 +5,7 @@ import {
   TriangleAlert,
 } from 'lucide-react';
 import CardField from './CardField';
-import { completeStripeVerification, requestCard } from './api';
+import { reportVerification, requestCard, runVerification } from './api';
 import type { OrderResult } from './api';
 import { errorKey, showDate, useLocale } from './locale';
 import type { CopyKey } from './locale';
@@ -222,7 +222,7 @@ function OrderView({ initialCode }: { initialCode: string }) {
     if (!details || controller.current) return;
     const current = new AbortController(); controller.current = current; setVerificationBusy(true); setVerificationError(null);
     try {
-      await completeStripeVerification(details);
+      await runVerification(code.trim().toUpperCase(), details);
       if (current.signal.aborted) return;
       await new Promise(resolve => setTimeout(resolve, 1000));
       const response = await requestCard('query', code.trim().toUpperCase(), current.signal);
@@ -234,6 +234,10 @@ function OrderView({ initialCode }: { initialCode: string }) {
       if (controller.current === current) { controller.current = null; setVerificationBusy(false); }
     }
   }
+
+  /* 验证提示出现时回报一次（同一份验证信息只报一次，去重在 reportVerification 里）。 */
+  const pendingVerification = result?.verification ?? null;
+  useEffect(() => { if (pendingVerification) reportVerification(code.trim().toUpperCase(), 'shown', pendingVerification); }, [pendingVerification]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* 从充值流程点「查询此卡密」跳过来时卡密已经在手上，直接查，不用再点一次。 */
   useEffect(() => { if (initialCode.trim()) void query(); }, []); // eslint-disable-line react-hooks/exhaustive-deps

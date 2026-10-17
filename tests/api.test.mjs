@@ -267,3 +267,129 @@ test('unknown service states and verification secrets are not treated as success
   assert.equal(result.verification, null);
   assert.doesNotMatch(JSON.stringify(result), /secret-123/);
 });
+
+test('Pro tiers collapse into one Pro label, so cards only ever show Go, Plus or Pro', async () => {
+  const cases = [
+    ['go', 'ChatGPT Go'], ['GO', 'ChatGPT Go'], ['plus', 'ChatGPT Plus'],
+    ['pro', 'ChatGPT Pro'], ['pro5', 'ChatGPT Pro'], ['pro20', 'ChatGPT Pro'], ['PRO25', 'ChatGPT Pro'],
+    ['promo', 'AI 订阅'], ['pro-max', 'AI 订阅'], ['constructor', 'AI 订阅'], [null, 'AI 订阅'],
+  ];
+  for (const [plan, label] of cases) {
+    const upstream = createUpstream({ origin: serviceOrigin, fetchImpl: async () => json({ code: 'OK', data: { ...order, plan } }) });
+    assert.equal((await upstream.verify(card)).plan, label, `verify ${plan}`);
+    assert.equal((await upstream.query(card)).plan, label, `query ${plan}`);
+  }
+});
+
+test('renewal and Codex point cards are refused when verifying or looking up, never shown as a recharge', async () => {
+  const refused = [
+    { plan: 'codex', creditQuantity: 500 },
+    { plan: 'pro20', cardType: 'PRO20_RENEWAL' },
+    { plan: 'plus', renewal: true },
+    { plan: 'plus', cardType: 'plus_renewal' },
+  ];
+  for (const extra of refused) {
+    const upstream = createUpstream({ origin: serviceOrigin, fetchImpl: async () => json({ code: 'OK', data: { ...order, ...extra } }) });
+    for (const action of ['verify', 'query']) {
+      await assert.rejects(() => upstream[action](card), error => error.status === 400 && error.code === 'UNSUPPORTED_CARD' && error.canQuery === false, `${action} ${JSON.stringify(extra)}`);
+    }
+  }
+  const standard = createUpstream({ origin: serviceOrigin, fetchImpl: async () => json({ code: 'OK', data: { ...order, cardType: 'STANDARD', renewal: false } }) });
+  assert.equal((await standard.verify(card)).plan, 'ChatGPT Plus');
+  assert.equal((await standard.query(card)).status, 'COMPLETED');
+});
+
+test('a refused card type is reported to the page and never unlocks submission', async () => {
+  const upstream = createUpstream({ origin: serviceOrigin, fetchImpl: async () => json({ code: 'OK', data: { plan: 'codex', creditQuantity: 500 } }) });
+  await withApi({ upstream }, async ({ request, authorize }) => {
+    await authorize();
+    const verify = await request('/api/cards/verify');
+    const refused = await verify.json();
+    assert.equal(verify.status, 400);
+    assert.equal(refused.error.code, 'UNSUPPORTED_CARD');
+    assert.doesNotMatch(JSON.stringify(refused), /codex|500|upstream|上游/i);
+    const submit = await request('/api/orders/submit', { code: card, sessionJson: JSON.stringify(sessionFile()), contact: '' });
+    assert.equal(submit.status, 403);
+    assert.equal((await submit.json()).error.code, 'CARD_VERIFICATION_REQUIRED');
+  });
+});
+
+test('verification progress is forwarded with the fixed event names, the card and nothing else', async () => {
+  const seen = [];
+  const upstream = createUpstream({ origin: serviceOrigin, fetchImpl: async (url, init) => {
+    assert.equal(url.href, 'https://service.example/api/public/orders/events');
+    assert.equal(init.redirect, 'error');
+    seen.push(JSON.parse(init.body));
+    return json({ code: 'OK', message: 'success' });
+  } });
+  await withApi({ upstream }, async ({ request }) => {
+    for (const event of ['shown', 'started', 'succeeded', 'failed']) {
+      const response = await request('/api/orders/events', { code: ` ${card.toLowerCase()} `, event });
+      assert.equal(response.status, 200, event);
+      const result = await response.json();
+      assert.deepEqual(result.data, { recorded: true });
+      assert.equal(response.headers.get('cache-control'), 'no-store');
+      assert.doesNotMatch(JSON.stringify(result), browserLeak);
+    }
+  });
+  assert.deepEqual(seen, [
+    { code: card, eventType: 'CUSTOMER_VERIFICATION_MODAL_SHOWN' },
+    { code: card, eventType: 'CUSTOMER_VERIFICATION_STARTED' },
+    { code: card, eventType: 'CUSTOMER_VERIFICATION_SUCCEEDED' },
+    { code: card, eventType: 'CUSTOMER_VERIFICATION_FAILED' },
+  ]);
+});
+
+test('an accepted verification event counts as delivered whatever the reply body looks like', async () => {
+  for (const reply of [() => new Response(null, { status: 204 }), () => new Response('ok', { status: 200, headers: { 'content-type': 'text/plain' } }), () => json({ code: 'OK', data: null })]) {
+    const upstream = createUpstream({ origin: serviceOrigin, fetchImpl: async () => reply() });
+    await upstream.recordVerificationEvent(card, 'started');
+  }
+});
+
+test('verification events reject unknown names, extra fields and bad cards before reaching the service', async () => {
+  let calls = 0;
+  const upstream = { recordVerificationEvent() { calls++; } };
+  await withApi({ upstream }, async ({ request }) => {
+    const bodies = [
+      {}, { code: card }, { event: 'started' }, { code: 'x', event: 'started' },
+      { code: card, event: 'CUSTOMER_VERIFICATION_STARTED' }, { code: card, event: 'constructor' }, { code: card, event: ['started'] },
+      { code: card, event: 'started', eventType: 'CUSTOMER_VERIFICATION_STARTED' }, { code: card, event: 'started', orderNo: 'x' }, [card],
+    ];
+    for (const body of bodies) assert.equal((await request('/api/orders/events', body)).status, 400, JSON.stringify(body));
+    assert.equal((await request('/api/orders/events', {}, { headers: { 'content-type': 'text/plain' } })).status, 415);
+    assert.equal((await request('/api/orders/events', { code: card, event: 'started' }, { headers: { 'content-type': 'application/json', origin: 'https://foreign.example' } })).status, 403);
+    assert.equal(calls, 0);
+  });
+});
+
+test('event delivery failures are mapped to safe errors and never leak service details', async t => {
+  const cases = [
+    ['unknown order', () => json({ code: 'NOT_FOUND', message: 'visit https://remote-provider.invalid 上游' }, 400), 404, 'ORDER_NOT_FOUND'],
+    ['busy', () => json({}, 429), 503, 'SERVICE_BUSY'],
+    ['server error', () => json({}, 500), 502, 'SERVICE_UNAVAILABLE'],
+    ['network', () => { throw new Error('private connection detail'); }, 502, 'SERVICE_UNAVAILABLE'],
+  ];
+  for (const [name, fetchImpl, status, code] of cases) await t.test(name, async () => {
+    const upstream = createUpstream({ origin: serviceOrigin, fetchImpl });
+    await withApi({ upstream }, async ({ request }) => {
+      const response = await request('/api/orders/events', { code: card, event: 'shown' });
+      const result = await response.json();
+      assert.equal(response.status, status);
+      assert.equal(result.error.code, code);
+      assert.doesNotMatch(JSON.stringify(result), /private|advertisement|remote-provider/);
+      assert.doesNotMatch(JSON.stringify(result), browserLeak);
+    });
+  });
+});
+
+test('an event falls back to the second service address when the first is unreachable', async () => {
+  const hosts = [];
+  const upstream = createUpstream({ origin: 'https://one.example,https://two.example', fetchImpl: async url => {
+    hosts.push(url.host);
+    if (url.host === 'one.example') throw new TypeError('connect failed');
+    return json({ code: 'OK' });
+  } });
+  await upstream.recordVerificationEvent(card, 'succeeded');
+  assert.deepEqual(hosts, ['one.example', 'two.example']);
+});

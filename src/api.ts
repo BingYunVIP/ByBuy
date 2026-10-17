@@ -116,11 +116,52 @@ function loadStripe(): Promise<void> {
   return stripeLoader;
 }
 
-export async function completeStripeVerification(details: VerificationDetails): Promise<void> {
+async function completeStripeVerification(details: VerificationDetails): Promise<void> {
   if (details.mode !== 'stripe' || Date.parse(details.expiresAt) <= Date.now()) throw new Error('Verification unavailable');
   await loadStripe();
   const stripe = window.Stripe?.(details.publishableKey);
   if (!stripe) throw new Error('Verification unavailable');
   const result = await stripe.handleNextAction({ clientSecret: details.clientSecret });
   if (result.error) throw new Error('Verification failed');
+}
+
+export type VerificationEvent = 'shown' | 'started' | 'succeeded' | 'failed';
+
+/* 同一份验证信息只报一次「出现」：订单页每刷新一次都会拿到同一份信息。
+   只记指纹，不把验证密钥留在模块里。 */
+const reportedShown = new Set<string>();
+
+function fingerprint(details: VerificationDetails): string {
+  let hash = 2166136261;
+  for (const char of `${details.mode}|${details.clientSecret}|${details.expiresAt}`) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
+  return String(hash >>> 0);
+}
+
+/* 把顾客安全验证的进度告诉服务端，由它转交给充值服务。
+   只带卡密和事件名；即发即忘，失败不影响验证本身。 */
+export function reportVerification(code: string, event: VerificationEvent, details?: VerificationDetails): void {
+  if (event === 'shown' && details) {
+    const key = fingerprint(details);
+    if (reportedShown.has(key)) return;
+    reportedShown.add(key);
+  }
+  void fetch('/api/orders/events', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code, event }),
+    cache: 'no-store',
+    keepalive: true,
+  }).catch(() => undefined);
+}
+
+/* 完成安全验证，并按「开始 → 成功 / 失败」回报进度。 */
+export async function runVerification(code: string, details: VerificationDetails): Promise<void> {
+  reportVerification(code, 'started');
+  try {
+    await completeStripeVerification(details);
+  } catch (error) {
+    reportVerification(code, 'failed');
+    throw error;
+  }
+  reportVerification(code, 'succeeded');
 }
