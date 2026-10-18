@@ -206,8 +206,8 @@ const preferenceKey = 'bybuy.preferences.v1';
 function preferences(): { lang: Language; theme: Theme } {
   let saved: { lang?: string; theme?: string } = {};
   try { saved = JSON.parse(localStorage.getItem(preferenceKey) || '{}') ?? {}; } catch { /* private browsing */ }
-  /* 默认暗色，与冰云首页保持一致；只有用户显式切过浅色，才按浅色渲染。 */
-  return { lang: saved.lang === 'en' ? 'en' : 'zh', theme: saved.theme === 'light' ? 'light' : 'dark' };
+  /* 默认浅色；只有用户显式切过深色，才按深色渲染。 */
+  return { lang: saved.lang === 'en' ? 'en' : 'zh', theme: saved.theme === 'dark' ? 'dark' : 'light' };
 }
 export function LocaleProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState(preferences);
@@ -216,7 +216,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
     document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
     document.documentElement.dataset.theme = theme;
     document.title = lang === 'zh' ? 'AI代充 · ChatGPT 自助充值' : 'AI Top-Up · ChatGPT top-up';
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#0e1116' : '#f4f5f7');
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#262421' : '#faf9f5');
     try { localStorage.setItem(preferenceKey, JSON.stringify(settings)); } catch { /* preferences are optional */ }
   }, [settings, lang, theme]);
   return <Context.Provider value={{ lang, theme, t: key => (lang === 'zh' ? zh : en)[key], toggleLanguage: () => setSettings(s => ({ ...s, lang: s.lang === 'zh' ? 'en' : 'zh' })), toggleTheme: () => setSettings(s => ({ ...s, theme: s.theme === 'light' ? 'dark' : 'light' })) }}>{children}</Context.Provider>;

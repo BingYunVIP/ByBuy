@@ -10,10 +10,10 @@
 /* 基础样式里的光晕是偏左的（at 18%），居中的精简版 hero 需要把它移到中间。
    .hero.hero--slim::before 的权重高于 .hero::before，所以能稳定覆盖。 */
 .hero.hero--slim::before {
-  background: radial-gradient(56rem 24rem at 50% -9rem, rgb(37 99 235 / 9%), transparent 68%);
+  background: radial-gradient(56rem 24rem at 50% -9rem, rgb(201 100 66 / 10%), transparent 68%);
 }
 :root[data-theme='dark'] .hero.hero--slim::before {
-  background: radial-gradient(56rem 24rem at 50% -9rem, rgb(77 134 255 / 14%), transparent 68%);
+  background: radial-gradient(56rem 24rem at 50% -9rem, rgb(217 119 87 / 13%), transparent 68%);
 }
 
 .hero-slim {

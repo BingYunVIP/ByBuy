@@ -7,8 +7,13 @@
 :root {
   color-scheme: light;
 
-  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans CJK SC', 'Microsoft YaHei', system-ui, sans-serif;
+  /* 全站字体：优先 HarmonyOS Sans SC（免费商用，观感接近苹方，400/500/600/700 四档真字重，
+     由 index.html 从 jsDelivr 按 unicode-range 分片按需加载，全平台渲染一致）；
+     CDN 不可用时回退苹果系统栈（SF Pro + 苹方 / Segoe UI + 微软雅黑）。 */
+  --font: 'HarmonyOS Sans SC', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Segoe UI', 'Hiragino Sans GB', 'Noto Sans CJK SC', 'Microsoft YaHei', system-ui, sans-serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-display: var(--font);
+  --font-hand: var(--font);
 
   /* Fixed type scale — deliberately NOT viewport-scaled, so a 2K/4K screen
      shows the same comfortable reading size as a laptop. */
@@ -20,67 +25,67 @@
   --fs-h3: 16px;
 
   /* Palette */
-  --bg: #f4f5f7;
+  --bg: #faf9f5;
   --surface: #ffffff;
-  --surface-2: #fafbfc;
-  --surface-3: #f1f3f6;
-  --text: #0f1319;
-  --text-2: #454c59;
-  --muted: #6b7280;
-  --border: #e6e8ec;
-  --border-2: #d7dbe2;
+  --surface-2: #f7f4ee;
+  --surface-3: #efece4;
+  --text: #1f1e1d;
+  --text-2: #57534e;
+  --muted: #7a7365;
+  --border: #e8e4dc;
+  --border-2: #d9d2c5;
 
-  --brand: #2563eb;
-  --brand-strong: #1d4ed8;
-  --brand-soft: #eef4ff;
-  --brand-ink: #16346d;
+  --brand: #c96442;
+  --brand-strong: #b04f31;
+  --brand-soft: #f8eee7;
+  --brand-ink: #6e3418;
 
-  --ok: #0f7b4f; --ok-bg: #eaf7f0; --ok-border: #c6e9d6;
-  --warn: #96540a; --warn-bg: #fff7e8; --warn-border: #f2ddb4;
-  --danger: #b42318; --danger-bg: #fef3f2;
+  --ok: #3d7a5c; --ok-bg: #eef4ea; --ok-border: #cfe0c6;
+  --warn: #96570f; --warn-bg: #faf3e0; --warn-border: #ecd9ae;
+  --danger: #bc3f2c; --danger-bg: #fbeeea;
 
-  --radius-sm: 8px;
-  --radius: 12px;
-  --radius-lg: 16px;
+  --radius-sm: 10px;
+  --radius: 14px;
+  --radius-lg: 20px;
 
-  --shadow-xs: 0 1px 2px rgb(16 24 40 / 5%);
-  --shadow-sm: 0 1px 3px rgb(16 24 40 / 8%), 0 1px 2px rgb(16 24 40 / 4%);
-  --shadow: 0 8px 24px -12px rgb(16 24 40 / 18%);
-  --shadow-lg: 0 24px 56px -28px rgb(16 24 40 / 28%);
+  --shadow-xs: 0 1px 2px rgb(72 56 38 / 6%);
+  --shadow-sm: 0 1px 3px rgb(72 56 38 / 9%), 0 1px 2px rgb(72 56 38 / 5%);
+  --shadow: 0 8px 24px -12px rgb(72 56 38 / 18%);
+  --shadow-lg: 0 24px 56px -28px rgb(72 56 38 / 28%);
 
   --container: 1140px;
   --header-h: 64px;
-  --glow: radial-gradient(52rem 26rem at 18% -8rem, rgb(37 99 235 / 9%), transparent 68%);
+  --glow: radial-gradient(52rem 26rem at 18% -8rem, rgb(201 100 66 / 10%), transparent 68%);
 }
 
 :root[data-theme='dark'] {
   color-scheme: dark;
 
-  --bg: #0e1116;
-  --surface: #171b22;
-  --surface-2: #1c212a;
-  --surface-3: #232932;
-  --text: #eef1f6;
-  --text-2: #c2c8d3;
-  --muted: #939caf;
-  --border: #262c36;
-  --border-2: #333b47;
+  --bg: #262421;
+  --surface: #30302c;
+  --surface-2: #37342f;
+  --surface-3: #3f3b35;
+  --text: #f5f4ef;
+  --text-2: #c9c3b8;
+  --muted: #a19a8c;
+  --border: #3b3831;
+  --border-2: #4c473d;
 
-  --brand: #4d86ff;
-  --brand-strong: #6b9cff;
-  --brand-soft: #16233c;
-  --brand-ink: #bcd3ff;
+  --brand: #d97757;
+  --brand-strong: #e58b6b;
+  --brand-soft: #3a2a22;
+  --brand-ink: #f0c9b4;
 
-  --ok: #6cd39b; --ok-bg: #122a1f; --ok-border: #1f4a35;
-  --warn: #f0c274; --warn-bg: #2c2313; --warn-border: #4a3a1c;
-  --danger: #ff9b93; --danger-bg: #2c1614;
+  --ok: #85bd90; --ok-bg: #262e22; --ok-border: #3c4a34;
+  --warn: #e8c07a; --warn-bg: #332a18; --warn-border: #55462a;
+  --danger: #f09583; --danger-bg: #33201a;
 
   --shadow-xs: 0 1px 2px rgb(0 0 0 / 40%);
   --shadow-sm: 0 1px 3px rgb(0 0 0 / 45%);
   --shadow: 0 10px 28px -14px rgb(0 0 0 / 60%);
   --shadow-lg: 0 28px 60px -30px rgb(0 0 0 / 72%);
 
-  --glow: radial-gradient(52rem 26rem at 18% -8rem, rgb(77 134 255 / 14%), transparent 68%);
+  --glow: radial-gradient(52rem 26rem at 18% -8rem, rgb(217 119 87 / 13%), transparent 68%);
 }
 
 * { box-sizing: border-box; }
@@ -106,6 +111,8 @@ button:disabled { cursor: not-allowed; }
 a { color: inherit; text-decoration: none; }
 :focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 6px; }
 h1, h2, h3, p { margin: 0; }
+/* 标题走衬线（Claude 风），正文保持系统字体保证可读性 */
+h1, h2, h3 { font-family: var(--font-display); }
 svg { display: inline-block; vertical-align: middle; flex-shrink: 0; }
 dl, dd, ol, ul { margin: 0; }
 
@@ -161,7 +168,7 @@ dl, dd, ol, ul { margin: 0; }
   background: color-mix(in srgb, var(--surface) 74%, transparent);
   backdrop-filter: blur(18px) saturate(160%);
   -webkit-backdrop-filter: blur(18px) saturate(160%);
-  box-shadow: 0 10px 32px -20px rgb(24 59 113 / 24%), inset 0 1px rgb(255 255 255 / 60%);
+  box-shadow: 0 10px 32px -20px rgb(87 60 40 / 26%), inset 0 1px rgb(255 255 255 / 60%);
 }
 :root[data-theme='dark'] .header-content {
   border-color: color-mix(in srgb, #ffffff 14%, transparent);

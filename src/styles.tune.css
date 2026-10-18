@@ -343,3 +343,10 @@
 @media (prefers-reduced-motion: reduce) {
   .task-section .session-guide a > span.guide-pointer { animation: none; }
 }
+
+/* ============================================ 手写体点缀（装饰性小字专用） */
+/* 只用在引导副句 / 提示胶囊 / 时间备注这类装饰性文字上，
+   正文、表单、订单数字一律保持系统字体，保证可读性。 */
+.notice-board-head p { font-family: var(--font-hand); letter-spacing: 0.02em; }
+.card-reminder.card-reminder--strong { font-family: var(--font-hand); letter-spacing: 0.02em; }
+.order-date-note { font-family: var(--font-hand); letter-spacing: 0.02em; }
