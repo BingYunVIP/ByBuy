@@ -1,8 +1,8 @@
 <p align="center">
   <img src="public/logo.png" alt="ByBuy" width="96" />
+  <br />
+  <a href="README.md">简体中文</a> | <b>English</b> | Site: <a href="https://buy.bingyun.vip">buy.bingyun.vip</a>
 </p>
-
-[简体中文](README.md) | **English** | Site: <https://buy.bingyun.vip>
 
 ## Features
 

@@ -1,8 +1,8 @@
 <p align="center">
   <img src="public/logo.png" alt="ByBuy" width="96" />
+  <br />
+  <b>简体中文</b> | <a href="README_en.md">English</a> | 站点：<a href="https://buy.bingyun.vip">buy.bingyun.vip</a>
 </p>
-
-**简体中文** | [English](README_en.md) | 站点：<https://buy.bingyun.vip>
 
 ## 项目功能
 
