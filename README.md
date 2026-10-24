@@ -1,5 +1,7 @@
 # ByBuy
 
+**简体中文** | [English](README_en.md)
+
 ByBuy 是 **AI代充** 的 ChatGPT 自助充值前后端项目：浏览器提交兑换卡密与 Session，
 服务端完成订阅校验、卡密验证、订单提交与进度查询。
 
