@@ -12,6 +12,11 @@
 - **Privacy**: the Session is verified in memory and forwarded to the top-up service only. It is never stored or logged, and the browser clears it right after submission.
 - **Interface**: Chinese and English, light and dark themes, language follows the browser automatically, responsive on mobile.
 
+## Routes
+
+- `/chatgpt`: ChatGPT top-up and order lookup; the root path redirects here.
+- `/team`: Team redemption interaction prototype with email-invite and ready-account demo modes; it does not submit real Team codes yet.
+
 ## Requirements
 
 - Linux (`ByBuy.sh` supports Linux only)
@@ -54,6 +59,8 @@ Production configuration lives in `.env`, excluded from version control (permiss
 | `HTTP_PROXY` / `HTTPS_PROXY` | Optional; trusted proxy for outbound requests | unset |
 | `NO_PROXY` | Optional; hosts that bypass the proxy | unset |
 | `UPSTREAM_TIMEOUT_MS` | Remote request timeout in milliseconds | `25000` |
+| `TEAM_REDEEM_ORIGIN` | HTTPS origin for the Team redemption proxy | `https://qitucloud.l.cd/team-redeem/` |
+| `TEAM_REDEEM_TIMEOUT_MS` | Team request timeout in milliseconds | `15000` |
 | `LOG_LEVEL` | `debug` / `info` / `warn` / `error` / `silent` | `info` |
 | `SERVICE_DIAGNOSTICS` | Whether to log additional diagnostic metadata | `0` |
 | `UPSTREAM_CONCURRENCY` | Per-process cap on concurrent remote requests | `8` |
@@ -71,6 +78,8 @@ npm ci
 cp .env.example .env      # fill in UPSTREAM_ORIGIN
 npm run dev               # Vite middleware + backend, single port
 ```
+
+The site entry is `/chatgpt`, and Team redemption is `/team`. The Team page uses same-origin ByBuy endpoints for inventory, invite redemption, and ready-account redemption; codes and account credentials stay in the request or page memory and are not persisted.
 
 ```bash
 npm test                  # unit tests

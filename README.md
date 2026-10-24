@@ -12,6 +12,11 @@
 - **隐私保护**：Session 只在内存中校验并转发给充值服务，不落库、不写日志，提交后前端立即清除。
 - **界面**：中英文双语、深浅主题，语言自动跟随浏览器，移动端自适应。
 
+## 页面入口
+
+- `/chatgpt`：ChatGPT 充值与订单查询，根路径会跳转到这里。
+- `/team`：Team 兑换交互原型，支持邮箱邀请和现成账号两种演示模式；当前不会提交真实 Team 卡密。
+
 ## 环境要求
 
 - Linux（`ByBuy.sh` 仅支持 Linux）
@@ -54,6 +59,8 @@ chmod +x ByBuy.sh
 | `HTTP_PROXY` / `HTTPS_PROXY` | 可选；访问外网时使用的受信任代理 | 未设置 |
 | `NO_PROXY` | 可选；不经过代理的主机列表 | 未设置 |
 | `UPSTREAM_TIMEOUT_MS` | 远程请求超时，单位毫秒 | `25000` |
+| `TEAM_REDEEM_ORIGIN` | Team 兑换公开接口的 HTTPS Origin（服务端代理） | `https://qitucloud.l.cd/team-redeem/` |
+| `TEAM_REDEEM_TIMEOUT_MS` | Team 接口超时，单位毫秒 | `15000` |
 | `LOG_LEVEL` | `debug` / `info` / `warn` / `error` / `silent` | `info` |
 | `SERVICE_DIAGNOSTICS` | 是否记录额外诊断元数据 | `0` |
 | `UPSTREAM_CONCURRENCY` | 单进程远程请求并发上限 | `8` |
@@ -71,6 +78,8 @@ npm ci
 cp .env.example .env      # 填写 UPSTREAM_ORIGIN
 npm run dev               # Vite 中间件 + 后端，单端口
 ```
+
+站点入口为 `/chatgpt`，Team 兑换入口为 `/team`。Team 页面通过 ByBuy 同源接口读取库存并提交邀请或成品账号兑换；卡密和账号凭据只在请求或当前页面内存中处理，不写入日志或持久化存储。
 
 ```bash
 npm test                  # 单元测试

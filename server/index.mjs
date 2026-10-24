@@ -28,6 +28,11 @@ app.use('/api', createApi({
   publicOrigin: process.env.PUBLIC_ORIGIN,
 }));
 
+/* Canonical product routes; keep the old order/redeem links usable. */
+app.get('/', (_req, res) => res.redirect(302, '/chatgpt'));
+app.get('/order', (_req, res) => res.redirect(302, '/chatgpt/order'));
+app.get(['/redeem', '/subscription'], (_req, res) => res.redirect(302, '/chatgpt'));
+
 const server = createServer(app);
 let vite;
 if (dev) {
@@ -43,7 +48,7 @@ if (dev) {
       res.set('Cache-Control', file.includes(`${path.sep}assets${path.sep}`) ? 'public, max-age=31536000, immutable' : 'no-cache');
     },
   }));
-  app.get(['/', '/order', '/redeem', '/subscription'], (_req, res) => {
+  app.get(['/', '/chatgpt', '/chatgpt/order', '/team', '/order', '/redeem', '/subscription'], (_req, res) => {
     res.set('Cache-Control', 'no-cache');
     res.sendFile(path.join(dist, 'index.html'));
   });

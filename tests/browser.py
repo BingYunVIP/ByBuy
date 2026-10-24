@@ -33,7 +33,25 @@ with sync_playwright() as p:
     page.on('request', lambda r: requests.append(r.url))
     page.on('pageerror', lambda e: errors.append(str(e)))
     page.on('console', lambda message: console_messages.append(message.text))
-    page.route('**/api/service/status', lambda route: route.fulfill(status=200, content_type='application/json', body=json.dumps({'ok': True, 'data': {'online': True, 'latencyMs': 20, 'cached': True}})))
+    page.route('**/api/service/status*', lambda route: route.fulfill(status=200, content_type='application/json', body=json.dumps({'ok': True, 'data': {'online': True, 'latencyMs': 20, 'cached': True}})))
+    page.route('**/api/team/availability', lambda route: route.fulfill(status=200, content_type='application/json', body=json.dumps({'ok': True, 'data': {'inviteSeatsRemaining': 48, 'readyAccountsRemaining': 11}})))
+    team_posts=[]
+    def team_invite(route):
+        posted=route.request.post_data_json
+        team_posts.append(posted)
+        assert set(posted)=={'cdk','email','request_id'}
+        assert re.fullmatch(r'[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}',posted['request_id'])
+        if posted['cdk']=='TEAM-TEST-ERROR':
+            route.fulfill(status=400,content_type='application/json',body=json.dumps({'ok':False,'error':{'code':'TEAM_REJECTED','message':'卡密不存在，请核对后重试。'}}))
+        else:
+            route.fulfill(status=200,content_type='application/json',body=json.dumps({'ok':True,'data':{'status':'success'}}))
+    def team_ready(route):
+        posted=route.request.post_data_json
+        team_posts.append(posted)
+        assert set(posted)=={'cdk','request_id'}
+        route.fulfill(status=200,content_type='application/json',body=json.dumps({'ok':True,'data':{'status':'success','account':{'email':'ready@example.test','password':'private-ready-password','totp_secret':'private-totp-secret'}}}))
+    page.route('**/api/team/invite',team_invite)
+    page.route('**/api/team/ready',team_ready)
 
     events=[]
     def record_event(route):
@@ -71,20 +89,57 @@ with sync_playwright() as p:
     try:
         navigate_home()
         expect(page.get_by_role('heading',name='ChatGPT 自助充值',exact=True)).to_be_visible()
+        assert any('/api/service/status?service=chatgpt' in url for url in requests), requests
         assert page.locator('.inspection-help,.footer-inner,footer').count()==0
         expect(page.get_by_text('卡密即凭证，请勿泄露给他人。',exact=True)).to_be_visible()
         assert page.locator('.brand img').get_attribute('src')=='/logo.png'
         expect(page.get_by_role('link',name='AI代充',exact=True)).to_be_visible()
         services=['官方渠道','正规VISA资金','只收人工费','数据加密传输','质保订阅一个月','售后有保障']
-        prices=['Plus ￥125','Pro 5x ￥700','Pro 10x ￥1100','Pro 25x ￥3200']
         assert page.locator('.hero-chips--services li').all_text_contents()==services
-        assert page.locator('.hero-chips--prices li').all_text_contents()==prices
-        for promise in services+prices:
+        for promise in services:
             expect(page.get_by_text(promise,exact=True)).to_be_visible()
         for removed in ['复购有优惠','菲律宾','智利','Pro '+'20x ￥1100']:
             assert page.get_by_text(removed,exact=True).count()==0
         assert '失败'+'可退' not in page.locator('.hero-chips').all_text_contents()
         assert page.locator('.header-links > *').all_text_contents()==['订单查询','全球价格对比','AI 中转站','冰云小店','售后群','联系邮箱']
+        assert page.evaluate("""() => { const h=document.querySelector('.hero-slim h1'); const s=document.querySelector('.hero-slim .product-switch'); return Boolean(h && s && (s.compareDocumentPosition(h)&Node.DOCUMENT_POSITION_FOLLOWING) && s.parentElement?.querySelector('.guide-pointer')); }""")
+        expect(page.get_by_role('button',name='ChatGPT 充值',exact=True)).to_have_attribute('aria-pressed','true')
+        page.get_by_role('button',name='Team 兑换',exact=True).click()
+        expect(page).to_have_url(re.compile(r'/team/?$'))
+        expect(page.get_by_role('heading',name='Team 兑换中心',exact=True)).to_be_visible()
+        assert any('/api/service/status?service=team' in url for url in requests), requests
+        assert page.locator('.redeem-header').count()==0
+        assert page.get_by_text('官方 Team 服务入口',exact=True).count()==0
+        assert page.get_by_text('自备邮箱接收团队邀请，或领取已经配置好的独立成品账号。',exact=True).count()==0
+        assert page.get_by_text('ByBuy Team',exact=True).count()==0
+        assert page.locator('.team-hero .hero-chips--services li svg').count()==7
+        expect(page.get_by_text('Team 当成 Plus',exact=True)).to_be_visible()
+        audit('team-empty')
+        page.get_by_role('button',name='切换深色模式',exact=True).click()
+        audit('team-dark')
+        page.get_by_role('button',name='切换浅色模式',exact=True).click()
+        page.get_by_label('卡密 (CDK)',exact=True).fill('TEAM-TEST-ERROR')
+        page.get_by_label('您的 ChatGPT 账号邮箱',exact=True).fill('demo@example.com')
+        page.get_by_role('button',name='立即兑换并拉入团队空间',exact=True).click()
+        expect(page.get_by_role('alert')).to_contain_text('卡密不存在')
+        page.get_by_label('卡密 (CDK)',exact=True).fill('TEAM-TEST-123456')
+        page.get_by_role('button',name='立即兑换并拉入团队空间',exact=True).click()
+        expect(page.get_by_role('heading',name='兑换成功！',exact=True)).to_be_visible()
+        page.get_by_role('button',name=re.compile('领取现成成品号')).click()
+        page.get_by_label('卡密 (CDK)',exact=True).fill('TEAM-TEST-READY')
+        page.get_by_role('button',name='立即核销并提取成品账号',exact=True).click()
+        expect(page.get_by_role('heading',name='账号出库成功！',exact=True)).to_be_visible()
+        expect(page.get_by_text('ready@example.test',exact=True)).to_be_visible()
+        stored_team=page.evaluate('JSON.stringify({...localStorage,...sessionStorage})')
+        assert 'private-ready-password' not in stored_team and 'private-totp-secret' not in stored_team
+        assert not any('/team-redeem/api/' in url for url in requests)
+        page.get_by_role('button',name='ChatGPT 充值',exact=True).click()
+        expect(page).to_have_url(re.compile(r'/chatgpt/?$'))
+        expect(page.get_by_role('heading',name='ChatGPT 自助充值',exact=True)).to_be_visible()
+        page.goto(f'{BASE}/order',wait_until='networkidle')
+        expect(page).to_have_url(re.compile(r'/chatgpt/order/?$'))
+        expect(page.get_by_role('heading',name='查询ChatGPT充值进度',exact=True)).to_be_visible()
+        navigate_home()
         for label,url in [('全球价格对比','https://appstoreprice.org/zh/apps/6448311069'),('AI 中转站','https://api.bingyun.vip'),('冰云小店','https://shop.bingyun.vip'),('售后群','https://qm.qq.com/q/6fuAq8mBwW')]:
             a=page.get_by_role('link',name=label,exact=True)
             expect(a).to_have_attribute('href',url)
@@ -110,13 +165,14 @@ with sync_playwright() as p:
         }""")
         expect(page.get_by_role('button',name='2 验证卡密',exact=True)).to_be_disabled()
         expect(page.get_by_role('button',name='3 完成提交',exact=True)).to_be_disabled()
+        expect(page.locator('html')).to_have_attribute('data-theme','light')
+        audit('light-empty')
+        page.screenshot(path=str(ARTIFACTS/'redesign-desktop.png'),full_page=True)
+        page.get_by_role('button',name='切换深色模式',exact=True).click()
         expect(page.locator('html')).to_have_attribute('data-theme','dark')
         audit('dark-empty')
         page.screenshot(path=str(ARTIFACTS/'redesign-dark.png'),full_page=True)
         page.get_by_role('button',name='切换浅色模式',exact=True).click()
-        expect(page.locator('html')).to_have_attribute('data-theme','light')
-        audit('light-empty')
-        page.screenshot(path=str(ARTIFACTS/'redesign-desktop.png'),full_page=True)
         page.get_by_role('button',name='Switch to English',exact=True).click()
         expect(page.get_by_role('link',name='Price Compare',exact=True)).to_be_visible()
         expect(page.get_by_role('link',name='AI Router',exact=True)).to_be_visible()
@@ -127,7 +183,7 @@ with sync_playwright() as p:
         expect(page.locator('html')).to_have_attribute('lang','en')
         page.reload(wait_until='networkidle')
         expect(page.get_by_role('heading',name='ChatGPT Self-Service Top-Up',exact=True)).to_be_visible()
-        for promise in ['One-month subscription warranty','After-sales support','Plus ￥125','Pro 5x ￥700','Pro 10x ￥1100','Pro 25x ￥3200']:
+        for promise in ['One-month subscription warranty','After-sales support']:
             expect(page.get_by_text(promise,exact=True)).to_be_visible()
         for removed in ['Repeat-order discount','Philippines','Chile','Pro '+'20x ￥1100']:
             assert page.get_by_text(removed,exact=True).count()==0
@@ -272,12 +328,31 @@ with sync_playwright() as p:
                 assert not page.evaluate('document.documentElement.scrollWidth>innerWidth'),'mobile-en'
                 page.get_by_role('button',name='切换中文',exact=True).click()
                 page.get_by_role('button',name='切换浅色模式',exact=True).click()
+        page.set_viewport_size({'width':375,'height':812})
+        page.locator('.header-menu summary').click()
+        assert page.locator('.header-menu-panel .product-switch-center').count()==0
+        assert page.locator('.header-menu-panel .product-switch').count()==1
+        expect(page.locator('.header-menu-panel').get_by_role('button',name='Team 兑换',exact=True)).to_be_visible()
+        page.locator('.header-menu-panel').get_by_role('button',name='Team 兑换',exact=True).click()
+        expect(page).to_have_url(re.compile(r'/team/?$'))
+        expect(page.get_by_role('heading',name='Team 兑换中心',exact=True)).to_be_visible()
+        assert not page.evaluate('document.documentElement.scrollWidth>innerWidth'),'mobile-team'
+        page.locator('.header-menu summary').click()
+        page.locator('.header-menu-panel').get_by_role('button',name='ChatGPT 充值',exact=True).click()
+        expect(page).to_have_url(re.compile(r'/chatgpt/?$'))
+        page.route('**/api/team/availability', lambda route: route.fulfill(status=502, content_type='application/json', body=json.dumps({'ok':False,'error':{'code':'TEAM_UNAVAILABLE','message':'offline'}})))
+        page.goto(f'{BASE}/team',wait_until='networkidle')
+        expect(page.get_by_role('heading',name='Team 兑换中心',exact=True)).to_be_visible()
+        expect(page.get_by_label('兑换方式')).to_be_visible()
+        assert page.locator('.inventory-updated').count()==0
+        assert page.get_by_text('暂不可查',exact=True).count()==0
         assert not errors,errors
         browser_surface='\n'.join([page.content(),*requests,*console_messages])
         assert not re.search(r'remote-provider\.invalid|upstream|上游',browser_surface,re.I),browser_surface
         stored=page.evaluate('JSON.stringify({...localStorage})')
         assert 'access' not in stored and 'synthetic' not in stored and 'ticket' not in stored
-        assert all(urlparse(url).netloc==urlparse(BASE).netloc for url in requests if url.startswith('http'))
+        allowed_static_hosts={urlparse(BASE).netloc,'cdn.jsdelivr.net'}
+        assert all(urlparse(url).netloc in allowed_static_hosts for url in requests if url.startswith('http'))
         assert page.locator('.inspection-help,.footer-inner').count()==0
         summary={'javascriptErrors':errors,'consoleMessages':console_messages,'browserLeakCheck':True,'accessibilityViolations':violations,'viewports':[1440,1920,2560,3840,375,320,768,'812x375'],'desktopMetrics':desktop_metrics,'themes':['light','dark'],'languages':['zh','en'],'personalFreeGate':True,'syntheticCredentialsOnly':True}
         (ARTIFACTS/'redesign-browser-report.json').write_text(json.dumps(summary,ensure_ascii=False,indent=2))

@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import {
-  BadgeCheck, BadgeDollarSign, Ban, Check, ChevronDown, CircleCheck, CircleX, Clock3, CreditCard, HandCoins, Headphones, Info,
+  Ban, Check, ChevronDown, CircleCheck, CircleX, Clock3, Info,
   Languages, LoaderCircle, LockKeyhole, Moon, Search, ShieldCheck, Sun,
   TriangleAlert,
 } from 'lucide-react';
@@ -9,13 +9,19 @@ import { reportVerification, requestCard, runVerification } from './api';
 import type { OrderResult } from './api';
 import { errorKey, showDate, useLocale } from './locale';
 import type { CopyKey } from './locale';
+import ProductSwitch from './ProductSwitch';
+import type { ProductPage } from './ProductSwitch';
+import { heroServiceChips, ServiceChips } from './service-chips';
 import { ServiceBadge, ServiceNotice, ServiceStatusProvider, useServiceStatus } from './service-status';
 import './styles.slim.css';
 import './styles.motion.css';
 import './styles.order.css';
 import './styles.tune.css';
+import './styles.team.css';
+import './styles.unified.css';
 
 const Recharge = lazy(() => import('./SubscriptionCheck'));
+const TeamRedeem = lazy(() => import('./TeamRedeem'));
 const ORDER_POLL_MS = 5_000;
 
 /* 顶部导航的外链。SHOP 是卡密购买入口，与冰云首页「冰云商店」指向同一站点。 */
@@ -34,23 +40,6 @@ const navLinks = [
   { key: 'store', href: SHOP, icon: 'bag', external: true },
   { key: 'support', href: SUPPORT, icon: 'users', external: true },
   { key: 'email', href: `mailto:${EMAIL}`, icon: 'mail', external: false },
-] as const;
-
-/* Hero 关键词胶囊分两行：服务保障在上，套餐价格在下。 */
-const heroServiceChips = [
-  [ShieldCheck, '官方渠道', 'Official channel'],
-  [CreditCard, '正规VISA资金', 'Legit VISA funds'],
-  [HandCoins, '只收人工费', 'Service fee only'],
-  [LockKeyhole, '数据加密传输', 'Encrypted transfer'],
-  [BadgeCheck, '质保订阅一个月', 'One-month subscription warranty'],
-  [Headphones, '售后有保障', 'After-sales support'],
-] as const;
-
-const heroPriceChips = [
-  [BadgeDollarSign, 'Plus ￥125', 'Plus ￥125'],
-  [BadgeDollarSign, 'Pro 5x ￥700', 'Pro 5x ￥700'],
-  [BadgeDollarSign, 'Pro 10x ￥1100', 'Pro 10x ￥1100'],
-  [BadgeDollarSign, 'Pro 25x ￥3200', 'Pro 25x ￥3200'],
 ] as const;
 
 /* 注意事项。夹在引导条和充值卡之间 —— 提交前一定会看到。
@@ -100,6 +89,8 @@ const noticeGroups = [
   },
 ];
 
+function notifyRouteChange() { window.dispatchEvent(new Event('bybuy:navigate')); }
+
 /* 把 **…** 渲染成 <strong>，省得为几个加粗词写一堆 JSX。 */
 function emphasize(text: string) {
   return text.split('**').map((part, index) => (index % 2 ? <strong key={index}>{part}</strong> : part));
@@ -117,13 +108,19 @@ function NavIcon({ name }: { name: 'clock' | 'appstore' | 'openai' | 'bag' | 'us
   return <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7}><rect height="14" rx="3" width="18" x="3" y="5" /><path d="m3 7 9 6 9-6" /></svg>;
 }
 
+type ChatgptView = 'recharge' | 'order';
+
 /* 桌面端居中排列、窄屏折叠进菜单面板，两处渲染同一份导航数据。 */
-function HeaderNav({ page, navigate }: { page: 'recharge' | 'order'; navigate: (next: 'recharge' | 'order') => void }) {
+function HeaderNav({ product, chatgptView, navigateChatgpt }: {
+  product: ProductPage;
+  chatgptView: ChatgptView;
+  navigateChatgpt: (next: ChatgptView, code?: string) => void;
+}) {
   const { t } = useLocale();
   return <>
-    <button type="button" onClick={() => navigate(page === 'order' ? 'recharge' : 'order')} className={page === 'order' ? 'active' : ''} aria-current={page === 'order' ? 'page' : undefined}>
-      <NavIcon name="clock" /><span>{t(page === 'order' ? 'home' : 'orders')}</span>
-    </button>
+    {product === 'chatgpt' ? <button type="button" onClick={() => navigateChatgpt(chatgptView === 'order' ? 'recharge' : 'order')} className={chatgptView === 'order' ? 'active' : ''} aria-current={chatgptView === 'order' ? 'page' : undefined}>
+      <NavIcon name="clock" /><span>{t(chatgptView === 'order' ? 'home' : 'orders')}</span>
+    </button> : null}
     {navLinks.map(item => (
       <a key={item.key} href={item.href} {...(item.external ? { target: '_blank', rel: 'noopener noreferrer' } : { title: EMAIL })}>
         <NavIcon name={item.icon} /><span>{t(item.key)}</span>
@@ -309,36 +306,20 @@ function OrderView({ initialCode }: { initialCode: string }) {
   </>;
 }
 
-function RechargePage({ onQuery }: { onQuery: (code: string) => void }) {
-  const { t, lang } = useLocale();
+function RechargePage({ onQuery, onNavigateProduct }: { onQuery: (code: string) => void; onNavigateProduct: (next: ProductPage) => void }) {
+  const { t } = useLocale();
   /* 每次打开页面随机挑一个关键词胶囊放大，给首屏一个视觉焦点，
      也顺带让每次访问看起来不完全一样。
      用 useState 的惰性初始化，保证只在挂载时算一次 —— 重渲染时不会跳来跳去。 */
-  const [featured] = useState(() => Math.floor(Math.random() * heroServiceChips.length));
-  return <>
+  return <div className="chatgpt-page">
     <section className="hero hero--slim">
       <div className="container hero-slim">
-        <h1 className="bb-rise">{t('heroTitle')}</h1>
-        <div className="hero-chip-groups">
-          <ul className="hero-chips hero-chips--services">
-            {heroServiceChips.map(([Icon, zh, en], index) => (
-              <li
-                key={zh}
-                className={index === featured ? 'bb-pop hero-chip--featured' : 'bb-pop'}
-                style={{ animationDelay: `${90 + index * 55}ms` }}
-              >
-                <Icon size={15} aria-hidden="true" />{lang === 'zh' ? zh : en}
-              </li>
-            ))}
-          </ul>
-          <ul className="hero-chips hero-chips--prices">
-            {heroPriceChips.map(([Icon, zh, en], index) => (
-              <li key={zh} className="bb-pop" style={{ animationDelay: `${90 + (heroServiceChips.length + index) * 55}ms` }}>
-                <Icon size={15} aria-hidden="true" />{lang === 'zh' ? zh : en}
-              </li>
-            ))}
-          </ul>
+        <div className="route-switch-row bb-rise">
+          <span className="guide-pointer" aria-hidden="true">👉</span>
+          <ProductSwitch product="chatgpt" navigateProduct={onNavigateProduct} center />
         </div>
+        <h1 className="bb-rise">{t('heroTitle')}</h1>
+        <ServiceChips items={heroServiceChips} />
       </div>
     </section>
 
@@ -350,21 +331,61 @@ function RechargePage({ onQuery }: { onQuery: (code: string) => void }) {
         </Suspense>
       </div>
     </section>
-  </>;
+  </div>;
 }
 
 function Shell() {
   const { t, lang, theme, toggleLanguage, toggleTheme } = useLocale();
-  const [page, setPage] = useState<'recharge' | 'order'>(location.pathname === '/order' ? 'order' : 'recharge');
+  const initialProduct: ProductPage = location.pathname === '/team' ? 'team' : 'chatgpt';
+  const initialChatgptView: ChatgptView = location.pathname === '/order' || location.pathname === '/chatgpt/order' ? 'order' : 'recharge';
+  const [product, setProduct] = useState<ProductPage>(initialProduct);
+  const [chatgptView, setChatgptView] = useState<ChatgptView>(initialChatgptView);
   const [orderCode, setOrderCode] = useState('');
   const menu = useRef<HTMLDetailsElement>(null);
-  function navigate(next: 'recharge' | 'order', code = '') {
-    setPage(next); setOrderCode(code); history.pushState(null, '', next === 'order' ? '/order' : '/');
+  function canonicalizePath() {
+    const pathname = location.pathname;
+    if (pathname === '/') history.replaceState(null, '', '/chatgpt');
+    else if (pathname === '/order') history.replaceState(null, '', '/chatgpt/order');
+    else if (pathname === '/redeem' || pathname === '/subscription') history.replaceState(null, '', '/chatgpt');
   }
   useEffect(() => {
-    const changed = () => { setPage(location.pathname === '/order' ? 'order' : 'recharge'); setOrderCode(''); };
-    addEventListener('popstate', changed); return () => removeEventListener('popstate', changed);
+    canonicalizePath();
+    const changed = () => {
+      canonicalizePath();
+      const isTeam = location.pathname === '/team';
+      const isOrder = location.pathname === '/order' || location.pathname === '/chatgpt/order';
+      setProduct(isTeam ? 'team' : 'chatgpt');
+      setChatgptView(isOrder ? 'order' : 'recharge');
+      setOrderCode('');
+    };
+    addEventListener('popstate', changed);
+    return () => removeEventListener('popstate', changed);
   }, []);
+  function navigateProduct(next: ProductPage) {
+    setProduct(next);
+    if (next === 'team') {
+      setOrderCode('');
+      if (location.pathname !== '/team') history.pushState(null, '', '/team');
+    } else {
+      setChatgptView('recharge');
+      setOrderCode('');
+      if (location.pathname !== '/chatgpt') history.pushState(null, '', '/chatgpt');
+    }
+    notifyRouteChange();
+  }
+  function navigateChatgpt(next: ChatgptView, code = '') {
+    setProduct('chatgpt');
+    setChatgptView(next);
+    setOrderCode(code);
+    const pathname = next === 'order' ? '/chatgpt/order' : '/chatgpt';
+    if (location.pathname !== pathname) history.pushState(null, '', pathname);
+    notifyRouteChange();
+  }
+  useEffect(() => {
+    document.title = lang === 'zh'
+      ? (product === 'team' ? 'Team 兑换 · ByBuy' : chatgptView === 'order' ? '订单查询 · ByBuy' : 'ChatGPT 自助充值 · ByBuy')
+      : (product === 'team' ? 'Team Redeem · ByBuy' : chatgptView === 'order' ? 'Order lookup · ByBuy' : 'ChatGPT Top-Up · ByBuy');
+  }, [lang, product, chatgptView]);
   /* 窄屏菜单：点面板里任意一项就收起，点面板外也收起，
      免得它浮在内容上面挡住表单。 */
   useEffect(() => {
@@ -380,12 +401,12 @@ function Shell() {
 
     <header className="site-header">
       <div className="header-content">
-        <a href="/" className="brand" onClick={event => { event.preventDefault(); navigate('recharge'); }} aria-label={t('brand')}>
+        <a href="/chatgpt" className="brand" onClick={event => { event.preventDefault(); navigateProduct('chatgpt'); }} aria-label={t('brand')}>
           <img src="/logo.png" width="32" height="32" alt="" /><span>{t('brand')}</span>
         </a>
 
         <nav aria-label={t('nav')} className="header-links">
-          <HeaderNav page={page} navigate={navigate} />
+          <HeaderNav product={product} chatgptView={chatgptView} navigateChatgpt={navigateChatgpt} />
         </nav>
 
         <div className="header-settings">
@@ -397,7 +418,8 @@ function Shell() {
           <details className="header-menu" ref={menu}>
             <summary aria-label={t('menu')}><span className="burger" aria-hidden="true" /></summary>
             <div className="header-menu-panel" onClick={() => { if (menu.current) menu.current.open = false; }}>
-              <HeaderNav page={page} navigate={navigate} />
+              <ProductSwitch product={product} navigateProduct={navigateProduct} center={false} />
+              <HeaderNav product={product} chatgptView={chatgptView} navigateChatgpt={navigateChatgpt} />
             </div>
           </details>
         </div>
@@ -405,9 +427,10 @@ function Shell() {
     </header>
 
     <main id="main-content">
-      {page === 'order'
-        ? <div className="container page-shell"><OrderView key={orderCode} initialCode={orderCode} /></div>
-        : <RechargePage onQuery={code => navigate('order', code)} />}
+      {product === 'team' ? <div className="team-page"><Suspense fallback={<p className="loading-page" role="status"><LoaderCircle className="spinner" size={18} />{lang === 'zh' ? '正在打开 Team 兑换…' : 'Loading Team redemption…'}</p>}><TeamRedeem onNavigateProduct={navigateProduct} /></Suspense></div>
+        : chatgptView === 'order'
+          ? <div className="order-page"><div className="container page-shell"><div className="route-switch-row order-route-switch"><span className="guide-pointer" aria-hidden="true">👉</span><ProductSwitch product="chatgpt" navigateProduct={navigateProduct} center /></div><OrderView key={orderCode} initialCode={orderCode} /></div></div>
+          : <RechargePage onQuery={code => navigateChatgpt('order', code)} onNavigateProduct={navigateProduct} />}
     </main>
   </>;
 }

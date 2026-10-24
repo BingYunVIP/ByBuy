@@ -9,7 +9,9 @@ export const TEAM = 'test-business-workspace';
 export function jwt(payload, header = { alg: 'RS256', typ: 'JWT' }) {
   return `${Buffer.from(JSON.stringify(header)).toString('base64url')}.${Buffer.from(JSON.stringify(payload)).toString('base64url')}.synthetic_signature`;
 }
-export function credentials({ plan = 'plus', idAccount = ACCOUNT, accessExp = 1792503403, now } = {}) {
+/* Keep the default synthetic access token valid beyond the current development date;
+   individual tests that need expiry pass an explicit accessExp. */
+export function credentials({ plan = 'plus', idAccount = ACCOUNT, accessExp = 1893456000, now } = {}) {
   const iat = now ? Math.floor(now / 1000) - 100 : 1791639403;
   return {
     access_token: jwt({

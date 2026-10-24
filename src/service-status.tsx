@@ -17,6 +17,7 @@ import { useLocale } from './locale';
 export type ServiceState = 'checking' | 'online' | 'offline';
 
 type ServiceStatus = {
+  service: 'chatgpt' | 'team';
   state: ServiceState;
   latencyMs: number | null;
   retrying: boolean;
@@ -29,14 +30,18 @@ const POLL_MS = 30_000;
 const TEXT = {
   zh: {
     prefix: '系统状态', checking: '检测中', online: '正常', offline: '异常',
-    downTitle: '充值服务暂时不可用',
-    downBody: '充值服务当前异常，这部分的操作已暂时停用。稍后再试，或点右侧重新检测。',
+    chatgptDownTitle: 'ChatGPT 充值服务暂时不可用',
+    chatgptDownBody: 'ChatGPT 充值服务当前异常，充值与订单操作已暂时停用。稍后再试，或点右侧重新检测。',
+    teamDownTitle: 'Team 兑换服务暂时不可用',
+    teamDownBody: 'Team 兑换服务当前异常，兑换操作已暂时停用。稍后再试，或点右侧重新检测。',
     retry: '重新检测', retrying: '检测中…',
   },
   en: {
     prefix: 'System status', checking: 'Checking', online: 'Normal', offline: 'Down',
-    downTitle: 'Top-up service unavailable',
-    downBody: 'The top-up service is currently unavailable, so this section is disabled. Please try again later, or re-check on the right.',
+    chatgptDownTitle: 'ChatGPT top-up unavailable',
+    chatgptDownBody: 'ChatGPT top-up and order actions are temporarily disabled. Try again later, or re-check on the right.',
+    teamDownTitle: 'Team redemption unavailable',
+    teamDownBody: 'Team redemption is temporarily disabled. Try again later, or re-check on the right.',
     retry: 'Re-check', retrying: 'Checking…',
   },
 };
@@ -48,16 +53,31 @@ export function ServiceStatusProvider({ children }: { children: ReactNode }) {
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
   const [retrying, setRetrying] = useState(false);
   const [nonce, setNonce] = useState(0);
+  const [service, setService] = useState<'chatgpt' | 'team'>(location.pathname === '/team' ? 'team' : 'chatgpt');
 
   const refresh = useCallback(() => { setRetrying(true); setNonce(value => value + 1); }, []);
 
   useEffect(() => {
+    const onRoute = () => setService(location.pathname === '/team' ? 'team' : 'chatgpt');
+    window.addEventListener('popstate', onRoute);
+    window.addEventListener('bybuy:navigate', onRoute);
+    return () => {
+      window.removeEventListener('popstate', onRoute);
+      window.removeEventListener('bybuy:navigate', onRoute);
+    };
+  }, []);
+
+  useEffect(() => {
     const controller = new AbortController();
     let alive = true;
+    setState('checking');
+    setLatencyMs(null);
 
     async function probe(fresh: boolean) {
       try {
-        const response = await fetch(`/api/service/status${fresh ? '?fresh=1' : ''}`, { cache: 'no-store', signal: controller.signal });
+        const params = new URLSearchParams({ service });
+        if (fresh) params.set('fresh', '1');
+        const response = await fetch(`/api/service/status?${params}`, { cache: 'no-store', signal: controller.signal });
         const body = await response.json() as { ok?: boolean; data?: { online?: boolean; latencyMs?: number } };
         if (!alive) return;
         setState(response.ok && body?.ok && body.data?.online ? 'online' : 'offline');
@@ -86,9 +106,9 @@ export function ServiceStatusProvider({ children }: { children: ReactNode }) {
       clearInterval(timer);
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [nonce]);
+  }, [nonce, service]);
 
-  const value = useMemo(() => ({ state, latencyMs, retrying, refresh }), [state, latencyMs, retrying, refresh]);
+  const value = useMemo(() => ({ service, state, latencyMs, retrying, refresh }), [service, state, latencyMs, retrying, refresh]);
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
 
@@ -101,16 +121,20 @@ export function useServiceStatus(): ServiceStatus {
 /* ------------------------------------------------------------------ 顶部状态灯 */
 
 export function ServiceBadge() {
-  const { state, latencyMs } = useServiceStatus();
+  const { service, state, latencyMs } = useServiceStatus();
   const { lang } = useLocale();
   const copy = lang === 'zh' ? TEXT.zh : TEXT.en;
+  const serviceLabel = service === 'team' ? 'Team' : 'ChatGPT';
+  const prefix = lang === 'zh' ? `${serviceLabel} 状态` : `${serviceLabel} status`;
   return (
     <span
       className={`service-status service-status--${state}`}
-      title={latencyMs === null ? `${copy.prefix}：${copy[state]}` : `${copy.prefix}：${copy[state]} · ${latencyMs}ms`}
+      data-service={service}
+      title={latencyMs === null ? `${prefix}：${copy[state]}` : `${prefix}：${copy[state]} · ${latencyMs}ms`}
     >
       <span className="status-dot" aria-hidden="true" />
-      <span className="status-prefix">{copy.prefix}：</span>
+      <span className="status-service">{serviceLabel}</span>
+      <span className="status-prefix"> 状态：</span>
       <span className="status-value">{copy[state]}</span>
     </span>
   );
@@ -119,15 +143,17 @@ export function ServiceBadge() {
 /* -------------------------------------------------------------- 异常时的说明条 */
 
 export function ServiceNotice() {
-  const { retrying, refresh } = useServiceStatus();
+  const { service, retrying, refresh } = useServiceStatus();
   const { lang } = useLocale();
   const copy = lang === 'zh' ? TEXT.zh : TEXT.en;
+  const downTitle = service === 'team' ? copy.teamDownTitle : copy.chatgptDownTitle;
+  const downBody = service === 'team' ? copy.teamDownBody : copy.chatgptDownBody;
   return (
     <div className="service-notice" role="alert">
       <CircleAlert size={18} aria-hidden="true" />
       <div className="service-notice-text">
-        <strong>{copy.downTitle}</strong>
-        <p>{copy.downBody}</p>
+        <strong>{downTitle}</strong>
+        <p>{downBody}</p>
       </div>
       <button className="text-button" type="button" onClick={refresh} disabled={retrying}>
         <RefreshCw size={14} className={retrying ? 'spinner' : undefined} aria-hidden="true" />

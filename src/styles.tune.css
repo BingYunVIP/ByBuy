@@ -71,43 +71,6 @@
 .service-status--checking .status-dot { animation: bb-blink 1.2s ease-in-out infinite; }
 @keyframes bb-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
 
-/* ============================================ hero 关键词胶囊：随机放大一个 */
-
-/* App.tsx 每次挂载随机挑一个加上 .hero-chip--featured。
-   用「加大内边距 + 加大字号」来放大，而不是 transform: scale() ——
-   胶囊身上已经有 bb-pop 在动 transform，再叠一层会互相盖掉；
-   而且改内边距不会把相邻胶囊压住。 */
-.hero-slim .hero-chips li.hero-chip--featured {
-  position: relative;
-  padding: 9px 17px 9px 13px;
-  border-color: color-mix(in srgb, var(--brand) 34%, transparent);
-  background: var(--brand-soft);
-  color: var(--brand-strong);
-  font-size: var(--fs-body);
-  font-weight: 600;
-  box-shadow: var(--shadow-sm);
-}
-.hero-slim .hero-chips li.hero-chip--featured svg { width: 17px; height: 17px; }
-
-/* 呼吸光环。挂在 ::after 上，和胶囊自己的 bb-pop 各动各的，互不干扰。 */
-.hero-slim .hero-chips li.hero-chip--featured::after {
-  content: '';
-  position: absolute;
-  inset: -2px;
-  border: 1.5px solid color-mix(in srgb, var(--brand) 40%, transparent);
-  border-radius: inherit;
-  pointer-events: none;
-  animation: bb-chip-breathe 2.6s ease-in-out infinite;
-}
-@keyframes bb-chip-breathe {
-  0%, 100% { opacity: 0.3; transform: scale(1); }
-  50%      { opacity: 0.9; transform: scale(1.05); }
-}
-
-/* 放大 + 光环会比别的胶囊往外多出几个像素，把间距撑开一点，
-   免得光环贴到邻居身上。 */
-.hero-slim .hero-chips { gap: 10px 14px; }
-
 /* ------------------------------------------------- 充值页：引导条一行显示 */
 
 /* 原来把 <p> 撑成 flex-basis:100%，所以永远占两行 —— 这是"两行"的根源。
@@ -313,10 +276,7 @@
 @media (prefers-reduced-motion: reduce) {
   .service-status--checking .status-dot,
   .header-settings .service-status--online .status-dot,
-  .header-settings .service-status--online,
-  .hero-slim .hero-chips li.hero-chip--featured::after { animation: none !important; }
-  /* 关掉动效后，光环的"亮着"状态得补回来，否则放大后的胶囊会显得没描边 */
-  .hero-slim .hero-chips li.hero-chip--featured::after { opacity: 0.6; }
+  .header-settings .service-status--online { animation: none !important; }
 }
 
 /* ========================================== 引导条：👉 指示符 */

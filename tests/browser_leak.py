@@ -15,18 +15,31 @@ with sync_playwright() as playwright:
     console_messages = []
     page_errors = []
     requests = []
+    asset_bodies = {}
 
     page.on('console', lambda message: console_messages.append(message.text))
     page.on('pageerror', lambda error: page_errors.append(str(error)))
     page.on('request', lambda request: requests.append(request.url))
-    page.route('**/api/service/status', lambda route: route.fulfill(
+    def capture_asset(response):
+        if response.request.resource_type in {'script', 'stylesheet'} and urlparse(response.url).netloc == urlparse(BASE).netloc:
+            try:
+                asset_bodies[response.url] = response.text()
+            except Exception:
+                pass
+    page.on('response', capture_asset)
+    page.route('**/api/service/status*', lambda route: route.fulfill(
         status=200,
         content_type='application/json',
         body='{"ok":true,"data":{"online":true,"latencyMs":20,"cached":true}}',
     ))
+    page.route('**/api/team/availability', lambda route: route.fulfill(
+        status=200,
+        content_type='application/json',
+        body='{"ok":true,"data":{"inviteSeatsRemaining":45,"readyAccountsRemaining":21}}',
+    ))
 
     snapshots = []
-    for route in ['/', '/order']:
+    for route in ['/', '/chatgpt', '/chatgpt/order', '/team', '/order']:
         page.goto(f'{BASE}{route}', wait_until='networkidle')
         expect(page.locator('.service-status')).to_be_visible()
         assert page.locator('.upstream-status').count() == 0
@@ -36,18 +49,13 @@ with sync_playwright() as playwright:
     page.get_by_role('button', name='Switch to English', exact=True).click()
     snapshots.append(page.content())
 
-    asset_text = page.evaluate(r"""async () => {
-      const urls = [...document.querySelectorAll('script[src],link[rel="stylesheet"]')]
-        .map(node => node.src || node.href);
-      return (await Promise.all(urls.map(async url => await (await fetch(url)).text()))).join('\n');
-    }""")
-
-    browser_surface = '\n'.join([*snapshots, asset_text, *console_messages, *requests])
+    browser_surface = '\n'.join([*snapshots, *asset_bodies.values(), *console_messages, *requests])
     assert not FORBIDDEN.search(browser_surface), 'Browser-visible service details were found.'
     assert not page_errors, page_errors
 
     base_host = urlparse(BASE).netloc
-    assert all(urlparse(url).netloc == base_host for url in requests if url.startswith(('http://', 'https://'))), requests
+    allowed_static_hosts = {base_host, 'cdn.jsdelivr.net'}
+    assert all(urlparse(url).netloc in allowed_static_hosts for url in requests if url.startswith(('http://', 'https://'))), requests
 
     browser.close()
 

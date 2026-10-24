@@ -5,6 +5,7 @@ import { createSubscriptionChecker, readSubscriptionInput } from './subscription
 import { createEligibilityStore } from './eligibility.mjs';
 import { PROFILE_CLAIM, decodeJwt, parseSubscriptionInput, record, textValue } from '../shared/subscription.ts';
 import { appLog } from './logger.mjs';
+import { createTeamRedeem } from './team-redeem.mjs';
 
 const MAX_SUBMISSION_BYTES = 256 * 1024;
 
@@ -68,7 +69,7 @@ function rateLimiter({ limit = 30, windowMs = 60_000, now = Date.now } = {}) {
   };
 }
 
-export function createApi({ upstream = createUpstream(), subscriptions = createSubscriptionChecker(), publicOrigin, rateLimit } = {}) {
+export function createApi({ upstream = createUpstream(), teamRedeem = createTeamRedeem(), subscriptions = createSubscriptionChecker(), publicOrigin, rateLimit } = {}) {
   const router = express.Router();
   const canonicalOrigin = publicOrigin ? new URL(publicOrigin).origin : null;
   const eligibility = createEligibilityStore();
@@ -120,8 +121,27 @@ export function createApi({ upstream = createUpstream(), subscriptions = createS
        · fresh=1 只在用户点「重新检测」时带上，服务端仍有 3 秒下限。
      远端地址只存在于服务端，响应体里只有 { online, latencyMs, cached }。 */
   router.get('/service/status', rateLimiter({ limit: 240 }), async (req, res) => {
-    const data = await upstream.status({ fresh: req.query.fresh === '1' });
+    const data = req.query.service === 'team' && typeof teamRedeem.status === 'function'
+      ? await teamRedeem.status({ fresh: req.query.fresh === '1' })
+      : await upstream.status({ fresh: req.query.fresh === '1' });
     res.json({ ok: true, data });
+  });
+
+  router.get('/team/availability', rateLimiter({ limit: 60 }), async (_req, res) => {
+    const data = await teamRedeem.availability();
+    res.json({ ok: true, data });
+  });
+
+  router.post('/team/invite', rateLimiter({ limit: 8 }), express.json({ limit: '4kb', strict: true }), async (req, res) => {
+    if (!req.is('application/json')) throw new PublicError(415, 'INVALID_CONTENT_TYPE', '请求格式不正确，请刷新页面重试。');
+    const data = await teamRedeem.invite(req.body);
+    res.json({ ok: true, data, meta: { requestId: res.locals.requestId, durationMs: Math.round(performance.now() - res.locals.startedAt) } });
+  });
+
+  router.post('/team/ready', rateLimiter({ limit: 8 }), express.json({ limit: '4kb', strict: true }), async (req, res) => {
+    if (!req.is('application/json')) throw new PublicError(415, 'INVALID_CONTENT_TYPE', '请求格式不正确，请刷新页面重试。');
+    const data = await teamRedeem.ready(req.body);
+    res.json({ ok: true, data, meta: { requestId: res.locals.requestId, durationMs: Math.round(performance.now() - res.locals.startedAt) } });
   });
 
   router.use(rateLimiter(rateLimit));

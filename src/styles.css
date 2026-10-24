@@ -31,7 +31,7 @@
   --surface-3: #efece4;
   --text: #1f1e1d;
   --text-2: #57534e;
-  --muted: #7a7365;
+  --muted: #6f685c;
   --border: #e8e4dc;
   --border-2: #d9d2c5;
 
@@ -39,6 +39,8 @@
   --brand-strong: #b04f31;
   --brand-soft: #f8eee7;
   --brand-ink: #6e3418;
+  --action-primary: #b04f31;
+  --action-primary-hover: #9c4027;
 
   --ok: #3d7a5c; --ok-bg: #eef4ea; --ok-border: #cfe0c6;
   --warn: #96570f; --warn-bg: #faf3e0; --warn-border: #ecd9ae;
@@ -75,6 +77,8 @@
   --brand-strong: #e58b6b;
   --brand-soft: #3a2a22;
   --brand-ink: #f0c9b4;
+  --action-primary: #a4472b;
+  --action-primary-hover: #883820;
 
   --ok: #85bd90; --ok-bg: #262e22; --ok-border: #3c4a34;
   --warn: #e8c07a; --warn-bg: #332a18; --warn-border: #55462a;
@@ -293,8 +297,8 @@ dl, dd, ol, ul { margin: 0; }
   font-size: 14px; font-weight: 600; white-space: nowrap;
 }
 .primary-button svg, .secondary-button svg, .ghost-button svg { width: 16px; height: 16px; }
-.primary-button { background: var(--brand); color: #fff; box-shadow: var(--shadow-xs); }
-.primary-button:hover { background: var(--brand-strong); }
+.primary-button { background: var(--action-primary); color: #fff; box-shadow: var(--shadow-xs); }
+.primary-button:hover { background: var(--action-primary-hover); }
 .primary-button:disabled { background: var(--surface-3); color: var(--muted); box-shadow: none; }
 .secondary-button { background: var(--surface); border-color: var(--border-2); color: var(--text); box-shadow: var(--shadow-xs); }
 .secondary-button:hover { background: var(--surface-2); border-color: var(--muted); }

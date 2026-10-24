@@ -1,0 +1,303 @@
+/* --------------------------------------------------------------------------
+   Shared product surface
+
+   The Team redeem page is the visual reference for both business routes:
+   centered hero, blue route switch, black keyline, solid offset shadow and
+   generous mobile spacing.  These selectors are scoped so legacy form rules
+   remain useful inside the flow while every visible page shares one surface.
+   -------------------------------------------------------------------------- */
+
+.chatgpt-page,
+.order-page {
+  min-height: calc(100vh - var(--header-h));
+  padding: 18px max(18px, 3vw) 56px;
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+/* Shared hand pointer: Twemoji's exact 👉 artwork avoids platform-dependent
+   tofu boxes while keeping the requested right-pointing hand appearance. */
+.guide-pointer {
+  width: 28px;
+  height: 28px;
+  font-size: 0;
+  line-height: 1;
+  background: url('/icons/point-right.svg') center / contain no-repeat;
+}
+
+.task-section .session-guide a > span.guide-pointer {
+  width: 22px;
+  height: 22px;
+  font-size: 0;
+  background: url('/icons/point-right.svg') center / contain no-repeat;
+}
+
+/* The header status uses the same two-pixel keyline and offset shadow as the
+   shared product cards, while the semantic state remains color-coded. */
+.header-settings .service-status {
+  height: 32px;
+  padding-inline: 10px;
+  border: 2px solid #000;
+  background: #fff;
+  color: #0f172a;
+  box-shadow: 2px 2px 0 #000;
+}
+.header-settings .service-status--online { border-color: #000; background: #dcfce7; color: #166534; }
+.header-settings .service-status--offline { border-color: #000; background: #fee2e2; color: #991b1b; }
+.header-settings .service-status--checking { border-color: #000; background: #dbeafe; color: #1e3a8a; }
+.header-settings .service-status .status-dot { box-shadow: none; }
+.header-settings .service-status--online .status-dot { background: #16a34a; }
+.header-settings .service-status--offline .status-dot { background: #dc2626; }
+.header-settings .service-status--checking .status-dot { background: #2563eb; }
+
+:root[data-theme='dark'] .header-settings .service-status { background: #fff; color: #0f172a; }
+:root[data-theme='dark'] .header-settings .service-status--online { background: #dcfce7; color: #166534; }
+:root[data-theme='dark'] .header-settings .service-status--offline { background: #fee2e2; color: #991b1b; }
+:root[data-theme='dark'] .header-settings .service-status--checking { background: #dbeafe; color: #1e3a8a; }
+
+.chatgpt-page .container,
+.order-page .container {
+  width: min(100%, 960px);
+  max-width: 960px;
+  padding-inline: 0;
+}
+
+.chatgpt-page .hero.hero--slim {
+  padding: 12px 0 16px;
+  background: transparent;
+}
+
+.chatgpt-page .hero.hero--slim::before { display: none; }
+
+.chatgpt-page .hero-slim {
+  gap: 24px;
+  align-items: center;
+}
+
+.chatgpt-page .route-switch-row,
+.order-page .order-route-switch {
+  margin: 0 auto 24px;
+}
+
+.chatgpt-page .product-switch-center,
+.order-page .product-switch-center,
+.team-page .product-switch-center {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: min(100%, 360px);
+  gap: 4px;
+  padding: 4px;
+  border: 2px solid #000;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 3px 3px 0 #000;
+}
+
+.chatgpt-page .product-switch-center button,
+.order-page .product-switch-center button,
+.team-page .product-switch-center button {
+  width: 100%;
+  min-height: 38px;
+  padding-inline: 17px;
+  color: #475569;
+}
+
+/* The compact switch in the mobile menu intentionally stays a plain
+   `.product-switch`; only hero switches receive the equal-width segmented
+   treatment above. */
+.header-menu-panel .product-switch:not(.product-switch-center) {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 100%;
+}
+.header-menu-panel .product-switch:not(.product-switch-center) button {
+  width: 100%;
+}
+
+.chatgpt-page .product-switch-center button.active,
+.order-page .product-switch-center button.active,
+.team-page .product-switch-center button.active {
+  background: #58affa;
+  color: #000;
+  box-shadow: none;
+}
+
+.chatgpt-page .hero-slim h1,
+.order-page .page-intro h1,
+.team-page .team-hero h1 {
+  margin: 0;
+  color: #0f172a;
+  font-size: clamp(32px, 6vw, 56px);
+  font-weight: 950;
+  line-height: 1.05;
+  letter-spacing: -.055em;
+  text-align: center;
+}
+
+.chatgpt-page .hero-chips--services,
+.team-page .hero-chips--services {
+  width: 100%;
+  margin: 0 auto;
+  gap: 9px;
+}
+
+.chatgpt-page .hero-chips--services li,
+.team-page .hero-chips--services li {
+  border: 2px solid #000;
+  background: #fff;
+  color: #0f172a;
+  box-shadow: 2px 2px 0 #000;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.chatgpt-page .hero-chips--services li:nth-child(2n),
+.team-page .hero-chips--services li:nth-child(2n) { background: #dbeafe; }
+.chatgpt-page .hero-chips--services li svg,
+.team-page .hero-chips--services li svg { width: 15px; height: 15px; }
+
+.chatgpt-page .task-section {
+  padding: 0;
+}
+
+.chatgpt-page .notice-board {
+  margin: 12px 0 16px;
+  padding: 18px 20px 20px;
+  border: 2px solid #000;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 4px 4px 0 #000;
+}
+
+.chatgpt-page .notice-board-head { margin-bottom: 14px; }
+.chatgpt-page .notice-board-head > svg { color: #2563eb; }
+.chatgpt-page .notice-board-head h2 { color: #0f172a; font-weight: 900; }
+.chatgpt-page .notice-board-head p { color: #475569; }
+
+.chatgpt-page .notice-group {
+  border: 2px solid #000;
+  border-radius: 14px;
+  box-shadow: 2px 2px 0 #000;
+}
+
+.chatgpt-page .flow-card,
+.order-page .flow-card {
+  overflow: hidden;
+  border: 2px solid #000;
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 6px 6px 0 #000;
+}
+
+.chatgpt-page .steps {
+  border-bottom: 2px solid #000;
+  background: #dbeafe;
+}
+
+.chatgpt-page .steps .current button { color: #1d4ed8; }
+.chatgpt-page .steps .current .step-circle { background: #58affa; border-color: #000; color: #000; }
+.chatgpt-page .steps .done .step-circle { border-color: #000; background: #dcfce7; color: #166534; }
+
+.chatgpt-page .flow-body { padding: clamp(20px, 4vw, 42px); }
+.chatgpt-page .session-guide,
+.chatgpt-page .loaded-file,
+.chatgpt-page textarea,
+.chatgpt-page .code-input,
+.chatgpt-page .account-select select {
+  border: 2px solid #000;
+  border-radius: 15px;
+  background: #f8fafc;
+  box-shadow: 2px 2px 0 #000;
+}
+
+.chatgpt-page .session-guide { margin-bottom: 22px; }
+.chatgpt-page .session-guide a { color: #1d4ed8; }
+.chatgpt-page .session-guide p,
+.chatgpt-page .form-bottom > span,
+.chatgpt-page .field-note { color: #475569; }
+.chatgpt-page .form-label-row label,
+.chatgpt-page .card-field > label,
+.chatgpt-page .account-select label { color: #0f172a; }
+.chatgpt-page .text-button { color: #1d4ed8; }
+.chatgpt-page textarea:focus,
+.chatgpt-page .code-input:focus-within { border-color: #2563eb; box-shadow: 2px 2px 0 #000; }
+.chatgpt-page .primary-button,
+.chatgpt-page .secondary-button,
+.order-page .primary-button,
+.order-page .secondary-button {
+  border: 2px solid #000;
+  border-radius: 13px;
+  box-shadow: 3px 3px 0 #000;
+  font-weight: 850;
+}
+
+.chatgpt-page .primary-button,
+.order-page .primary-button { background: #58affa; color: #000; }
+.chatgpt-page .primary-button:hover,
+.order-page .primary-button:hover { background: #7cc4ff; }
+.chatgpt-page .secondary-button,
+.order-page .secondary-button { background: #f1f5f9; color: #000; }
+.chatgpt-page .notice,
+.order-page .notice { border-width: 2px; }
+
+.chatgpt-page .page-intro,
+.order-page .page-intro {
+  max-width: none;
+  padding: 0 0 18px;
+  text-align: center;
+}
+
+.order-page .order-route-switch { margin-bottom: 24px; }
+.order-page .order-card { max-width: 960px; padding: clamp(20px, 4vw, 42px); }
+.order-page .order-card form > .primary-button { min-height: 52px; margin-top: 20px; }
+.order-page .order-result { border-top: 2px solid #e2e8f0; }
+.order-page .order-headline,
+.order-page .order-facts { border-width: 2px; border-color: #000; box-shadow: 2px 2px 0 #000; }
+
+/* The status notice is part of the same card language when a probe fails. */
+.chatgpt-page .service-notice,
+.order-page .service-notice,
+.team-page .service-notice {
+  margin: 0 0 14px;
+  border: 2px solid #000;
+  border-radius: 16px;
+  box-shadow: 3px 3px 0 #000;
+}
+
+:root[data-theme='dark'] .chatgpt-page,
+:root[data-theme='dark'] .order-page {
+  background: #101827;
+  color: #e5edf7;
+}
+
+:root[data-theme='dark'] .chatgpt-page .hero-slim h1,
+:root[data-theme='dark'] .order-page .page-intro h1,
+:root[data-theme='dark'] .team-page .team-hero h1 { color: #e5edf7; }
+
+@media (max-width: 640px) {
+  .chatgpt-page,
+  .order-page { padding: 10px 14px 40px; }
+
+  .chatgpt-page .container,
+  .order-page .container { padding-inline: 0; }
+
+  .chatgpt-page .hero.hero--slim { padding: 18px 0 12px; }
+  .chatgpt-page .hero-slim { gap: 18px; }
+  .chatgpt-page .product-switch-center button,
+  .order-page .product-switch-center button,
+  .team-page .product-switch-center button { min-height: 36px; padding-inline: 10px; font-size: 12px; }
+  .chatgpt-page .hero-slim h1,
+  .order-page .page-intro h1 { font-size: 39px; }
+  .chatgpt-page .hero-chips--services li,
+  .team-page .hero-chips--services li { padding: 7px 9px; font-size: 11px; }
+  .header-settings .service-status { padding-inline: 8px; }
+  .header-settings .service-status .status-prefix { display: none; }
+  .chatgpt-page .notice-board { padding: 16px; }
+  .chatgpt-page .flow-body,
+  .order-page .order-card { padding: 18px 14px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chatgpt-page .product-switch button,
+  .order-page .product-switch button { transition: none; }
+}

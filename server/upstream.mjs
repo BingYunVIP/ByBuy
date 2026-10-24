@@ -213,7 +213,7 @@ async function readJson(response) {
 }
 
 export function createUpstream({
-  origin = process.env.UPSTREAM_ORIGIN,
+  origin = process.env.UPSTREAM_ORIGIN || 'https://97gd.cn,https://www.97gd.cn',
   timeoutMs = 25_000,
   fetchImpl = globalThis.fetch,
   now = Date.now,

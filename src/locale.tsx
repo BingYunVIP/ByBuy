@@ -95,7 +95,7 @@ const zh = {
   completeVerification: '完成安全验证', verifyingPayment: '验证处理中…', verificationFailed: '安全验证未完成，请稍后在订单查询中重试。', verificationUnavailable: '安全验证信息暂不可用，请刷新状态重试。',
   submissionUnknown: '提交结果暂时无法确认，请使用原卡密查询订单，暂不要重复提交。', restart: '重新开始',
   checkRequired: '请先确认个人账号为 Free，再验证卡密。', ticketExpired: '检查结果已过期，请重新检查账号。',
-  viewOrder: '查询此卡密', orderTitle: '查询充值进度', orderSubtitle: '输入原卡密，查看订单状态。',
+  viewOrder: '查询此卡密', orderTitle: '查询ChatGPT充值进度', orderSubtitle: '输入原卡密，查看订单状态。',
   query: '查询订单', querying: '正在查询…', account: '充值账号', orderNo: '订单尾号', status: '订单状态', completedAt: '完成时间',
   completed: '充值已完成', processing: '充值处理中', queued: '等待处理', failed: '充值未完成', cancelled: '已取消',
   needsHelp: '订单需要进一步处理', notFound: '未找到订单，请检查卡密。', network: '连接失败，请检查网络连接。',
@@ -237,7 +237,6 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
     document.documentElement.dataset.theme = theme;
-    document.title = lang === 'zh' ? 'AI代充 · ChatGPT 自助充值' : 'AI Top-Up · ChatGPT top-up';
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#262421' : '#faf9f5');
     /* 只持久化用户显式做过的选择：没手动切过语言时，下次访问仍按浏览器语言重新判定。 */
     try { localStorage.setItem(preferenceKey, JSON.stringify(settings.langChosen ? { lang, theme } : { theme })); } catch { /* preferences are optional */ }
