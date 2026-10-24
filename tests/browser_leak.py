@@ -11,7 +11,7 @@ FORBIDDEN = re.compile(r'remote-provider\.invalid|upstream|上游', re.I)
 
 with sync_playwright() as playwright:
     browser = playwright.chromium.launch(headless=True, args=['--no-sandbox'])
-    page = browser.new_page(viewport={'width': 1440, 'height': 1000})
+    page = browser.new_page(viewport={'width': 1440, 'height': 1000}, locale='zh-CN')
     console_messages = []
     page_errors = []
     requests = []

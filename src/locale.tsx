@@ -203,11 +203,33 @@ type Theme = 'light' | 'dark';
 const Context = createContext<{ lang: Language; theme: Theme; t: (key: CopyKey) => string; toggleLanguage: () => void; toggleTheme: () => void } | null>(null);
 const preferenceKey = 'bybuy.preferences.v1';
 
-function preferences(): { lang: Language; theme: Theme } {
+/* 浏览器语言探测：按 navigator.languages 的优先顺序取第一个受支持的语言。
+   中文各变体（zh / zh-CN / zh-TW / zh-HK …）归为 zh，英语及其它语言归为 en。
+   navigator.languages 为空（旧浏览器或隐私模式）时退回 navigator.language。 */
+function detectLanguage(): Language {
+  if (typeof navigator === 'undefined') return 'en';
+  const tags = navigator.languages?.length ? navigator.languages : [navigator.language];
+  for (const tag of tags) {
+    const base = String(tag || '').toLowerCase().split('-')[0];
+    if (base === 'zh') return 'zh';
+    if (base === 'en') return 'en';
+  }
+  return 'en';
+}
+
+type Settings = { lang: Language; theme: Theme; langChosen: boolean };
+
+function preferences(): Settings {
   let saved: { lang?: string; theme?: string } = {};
   try { saved = JSON.parse(localStorage.getItem(preferenceKey) || '{}') ?? {}; } catch { /* private browsing */ }
-  /* 默认浅色；只有用户显式切过深色，才按深色渲染。 */
-  return { lang: saved.lang === 'en' ? 'en' : 'zh', theme: saved.theme === 'dark' ? 'dark' : 'light' };
+  /* 语言：用户手动切换过就用保存值，从未切换过则跟随浏览器语言。
+     主题：默认浅色，只有用户显式切过深色才按深色渲染。 */
+  const chosen = saved.lang === 'zh' || saved.lang === 'en';
+  return {
+    lang: chosen ? (saved.lang as Language) : detectLanguage(),
+    theme: saved.theme === 'dark' ? 'dark' : 'light',
+    langChosen: chosen,
+  };
 }
 export function LocaleProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState(preferences);
@@ -217,9 +239,10 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
     document.documentElement.dataset.theme = theme;
     document.title = lang === 'zh' ? 'AI代充 · ChatGPT 自助充值' : 'AI Top-Up · ChatGPT top-up';
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#262421' : '#faf9f5');
-    try { localStorage.setItem(preferenceKey, JSON.stringify(settings)); } catch { /* preferences are optional */ }
+    /* 只持久化用户显式做过的选择：没手动切过语言时，下次访问仍按浏览器语言重新判定。 */
+    try { localStorage.setItem(preferenceKey, JSON.stringify(settings.langChosen ? { lang, theme } : { theme })); } catch { /* preferences are optional */ }
   }, [settings, lang, theme]);
-  return <Context.Provider value={{ lang, theme, t: key => (lang === 'zh' ? zh : en)[key], toggleLanguage: () => setSettings(s => ({ ...s, lang: s.lang === 'zh' ? 'en' : 'zh' })), toggleTheme: () => setSettings(s => ({ ...s, theme: s.theme === 'light' ? 'dark' : 'light' })) }}>{children}</Context.Provider>;
+  return <Context.Provider value={{ lang, theme, t: key => (lang === 'zh' ? zh : en)[key], toggleLanguage: () => setSettings(s => ({ ...s, lang: s.lang === 'zh' ? 'en' : 'zh', langChosen: true })), toggleTheme: () => setSettings(s => ({ ...s, theme: s.theme === 'light' ? 'dark' : 'light' })) }}>{children}</Context.Provider>;
 }
 export function useLocale() { const value = useContext(Context); if (!value) throw new Error('LocaleProvider required'); return value; }
 export function errorKey(code?: string): CopyKey {

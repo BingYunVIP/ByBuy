@@ -26,7 +26,7 @@ def live(plan='free', scope='personal', fail=False):
 
 with sync_playwright() as p:
     browser = p.chromium.launch(headless=True, args=['--no-sandbox'])
-    context = browser.new_context(viewport={'width': 1440, 'height': 1000}, reduced_motion='reduce', color_scheme='light')
+    context = browser.new_context(viewport={'width': 1440, 'height': 1000}, reduced_motion='reduce', color_scheme='light', locale='zh-CN')
     page = context.new_page()
     page.add_init_script("window.Stripe=()=>({handleNextAction:async()=>({})})")
     requests, posts, errors, console_messages, violations = [], [], [], [], []
