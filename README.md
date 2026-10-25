@@ -10,6 +10,7 @@
 - **订单查询**：用原卡密查看进度（等待处理 / 处理中 / 已完成 / 未完成），处理中的订单自动刷新。
 - **订阅核验**：只接受个人 Free 账号，服务端在线确认 `personal + free` 后才签发短期验证凭证。
 - **隐私保护**：Session 只在内存中校验并转发给充值服务，不落库、不写日志，提交后前端立即清除。
+- **脱敏日志**：ChatGPT 与 Team 的验卡、查询、提交、兑换都会记录（`service` 字段区分）。卡密只记带盐的短指纹，邮箱打码，IP 只留前两段，密码、令牌、Session 一律不写。
 - **界面**：中英文双语、深浅主题，语言自动跟随浏览器，移动端自适应。
 
 ## 页面入口
@@ -63,6 +64,7 @@ chmod +x ByBuy.sh
 | `Team_Web` | Team 兑换公开接口的 HTTPS Origin（服务端代理） | 未设置（Team 兑换显示「暂未开放」） |
 | `TEAM_REDEEM_TIMEOUT_MS` | Team 接口超时，单位毫秒 | `15000` |
 | `LOG_LEVEL` | `debug` / `info` / `warn` / `error` / `silent` | `info` |
+| `LOG_SALT` | 卡密指纹的盐。固定后，重启前后同一张卡的日志仍可关联；留空则每次启动随机生成 | 留空 |
 | `SERVICE_DIAGNOSTICS` | 是否记录额外诊断元数据 | `0` |
 | `UPSTREAM_CONCURRENCY` | 单进程远程请求并发上限 | `8` |
 | `UPSTREAM_QUEUE` | 并发闸门等待队列上限 | `100` |

@@ -3,11 +3,31 @@ import { randomUUID } from 'node:crypto';
 import { createUpstream, PublicError, readCard, readVerificationEvent } from './upstream.mjs';
 import { createSubscriptionChecker, readSubscriptionInput } from './subscriptions.mjs';
 import { createEligibilityStore } from './eligibility.mjs';
-import { PROFILE_CLAIM, decodeJwt, parseSubscriptionInput, record, textValue } from '../shared/subscription.ts';
-import { appLog } from './logger.mjs';
+import { PROFILE_CLAIM, decodeJwt, maskIdentifier, parseSubscriptionInput, record, textValue } from '../shared/subscription.ts';
+import { appLog, fingerprint, maskEmail, maskIp } from './logger.mjs';
 import { createTeamRedeem } from './team-redeem.mjs';
 
 const MAX_SUBMISSION_BYTES = 256 * 1024;
+
+/* 业务操作日志：ChatGPT 和 Team 共用同一个格式，用 service 字段区分。
+   只写脱敏后的标识（卡密指纹、打码邮箱），不写卡密、邮箱、密码、令牌、Session 原文。 */
+async function audited(res, category, service, event, fields, task) {
+  const started = performance.now();
+  const base = { requestId: res.locals.requestId, service, ...fields };
+  try {
+    const data = await task();
+    appLog.info(category, event, { ...base, outcome: 'OK', durationMs: Math.round(performance.now() - started) });
+    return data;
+  } catch (error) {
+    const status = error?.status ?? 500;
+    appLog[status >= 500 ? 'error' : 'warn'](category, event, {
+      ...base, outcome: 'FAILED', status, code: error?.code ?? 'UNKNOWN', durationMs: Math.round(performance.now() - started),
+    });
+    throw error;
+  }
+}
+
+const cardId = body => fingerprint(typeof body?.cdk === 'string' ? body.cdk : body?.code);
 
 function sessionEmail(root, accessToken) {
   const user = record(root.user);
@@ -59,7 +79,7 @@ function rateLimiter({ limit = 30, windowMs = 60_000, now = Date.now } = {}) {
     const key = req.ip ?? 'unknown';
     const bucket = buckets.get(key) ?? { count: 0, until: time + windowMs };
     if (bucket.count >= limit || (!buckets.has(key) && buckets.size >= 10_000)) {
-      appLog.warn('SECURITY', 'RATE_LIMITED', { ip: key, limit, windowMs });
+      appLog.warn('SECURITY', 'RATE_LIMITED', { ip: maskIp(key), path: req.path, limit, windowMs });
       res.set('Retry-After', String(Math.max(1, Math.ceil((bucket.until - time) / 1000))));
       return next(new PublicError(429, 'RATE_LIMITED', '操作较频繁，请稍等一分钟后重试。'));
     }
@@ -87,7 +107,7 @@ export function createApi({ upstream = createUpstream(), teamRedeem = createTeam
           path: req.path,
           status: res.statusCode,
           durationMs: Math.round(performance.now() - res.locals.startedAt),
-          ip: req.ip ?? 'unknown',
+          ip: maskIp(req.ip),
         });
       }
     });
@@ -104,7 +124,7 @@ export function createApi({ upstream = createUpstream(), teamRedeem = createTeam
     const host = req.get('host');
     const sameOrigin = origin === `http://${host}` || origin === `https://${host}`;
     if (req.get('sec-fetch-site') === 'cross-site' || (origin && !sameOrigin && origin !== canonicalOrigin)) {
-      appLog.warn('SECURITY', 'ORIGIN_REJECTED', { requestId: res.locals.requestId, ip: req.ip ?? 'unknown', method: req.method, path: req.path });
+      appLog.warn('SECURITY', 'ORIGIN_REJECTED', { requestId: res.locals.requestId, ip: maskIp(req.ip), method: req.method, path: req.path });
       return next(new PublicError(403, 'ORIGIN_REJECTED', '请在 ByBuy 页面中完成操作。'));
     }
     next();
@@ -134,13 +154,13 @@ export function createApi({ upstream = createUpstream(), teamRedeem = createTeam
 
   router.post('/team/invite', rateLimiter({ limit: 8 }), express.json({ limit: '4kb', strict: true }), async (req, res) => {
     if (!req.is('application/json')) throw new PublicError(415, 'INVALID_CONTENT_TYPE', '请求格式不正确，请刷新页面重试。');
-    const data = await teamRedeem.invite(req.body);
+    const data = await audited(res, 'TEAM', 'team', 'INVITE', { card: cardId(req.body), email: maskEmail(req.body?.email) ?? 'invalid' }, () => teamRedeem.invite(req.body));
     res.json({ ok: true, data, meta: { requestId: res.locals.requestId, durationMs: Math.round(performance.now() - res.locals.startedAt) } });
   });
 
   router.post('/team/ready', rateLimiter({ limit: 8 }), express.json({ limit: '4kb', strict: true }), async (req, res) => {
     if (!req.is('application/json')) throw new PublicError(415, 'INVALID_CONTENT_TYPE', '请求格式不正确，请刷新页面重试。');
-    const data = await teamRedeem.ready(req.body);
+    const data = await audited(res, 'TEAM', 'team', 'READY_ACCOUNT', { card: cardId(req.body) }, () => teamRedeem.ready(req.body));
     res.json({ ok: true, data, meta: { requestId: res.locals.requestId, durationMs: Math.round(performance.now() - res.locals.startedAt) } });
   });
 
@@ -157,6 +177,8 @@ export function createApi({ upstream = createUpstream(), teamRedeem = createTeam
         const grant = eligibility.issue(data, input.accountId);
         appLog.info('SUBSCRIPTION', 'CHECK_COMPLETED', {
           requestId: res.locals.requestId,
+          service: 'chatgpt',
+          account: maskIdentifier(input.accountId),
           credentialState: data.credentialState,
           result: data.selected ? `${data.selected.scope}:${data.selected.status}` : 'unconfirmed',
           eligibilityIssued: Boolean(grant),
@@ -172,8 +194,9 @@ export function createApi({ upstream = createUpstream(), teamRedeem = createTeam
     const input = readOrderSubmission(req.body);
     const ticket = req.get('X-ByBuy-Eligibility');
     eligibility.claimSubmission(ticket, input.code, input.accountId);
-    appLog.info('ORDER', 'SUBMISSION_ACCEPTED', { requestId: res.locals.requestId });
-    const data = await upstream.submit(input);
+    const data = await audited(res, 'ORDER', 'chatgpt', 'SUBMIT', {
+      card: fingerprint(input.code), account: maskIdentifier(input.accountId), email: maskEmail(input.accountEmail) ?? 'unknown',
+    }, () => upstream.submit(input));
     res.json({ ok: true, data, meta: { requestId: res.locals.requestId, durationMs: Math.round(performance.now() - res.locals.startedAt) } });
   });
 
@@ -185,7 +208,7 @@ export function createApi({ upstream = createUpstream(), teamRedeem = createTeam
       const code = readCard(req.body);
       const ticket = req.get('X-ByBuy-Eligibility');
       if (action === 'verify') eligibility.require(ticket);
-      const data = await upstream[action](code);
+      const data = await audited(res, 'ORDER', 'chatgpt', action === 'verify' ? 'CARD_VERIFY' : 'ORDER_QUERY', { card: fingerprint(code) }, () => upstream[action](code));
       if (action === 'verify') eligibility.markCardVerified(ticket, code);
       res.json({ ok: true, data, meta: { requestId: res.locals.requestId, durationMs: Math.round(performance.now() - res.locals.startedAt) } });
     });
@@ -197,7 +220,7 @@ export function createApi({ upstream = createUpstream(), teamRedeem = createTeam
     if (!req.is('application/json')) throw new PublicError(415, 'INVALID_CONTENT_TYPE', '请求格式不正确，请刷新页面重试。');
     const { code, event } = readVerificationEvent(req.body);
     await upstream.recordVerificationEvent(code, event);
-    appLog.info('ORDER', 'VERIFICATION_EVENT', { requestId: res.locals.requestId, event });
+    appLog.info('ORDER', 'VERIFICATION_EVENT', { requestId: res.locals.requestId, service: 'chatgpt', card: fingerprint(code), event });
     res.json({ ok: true, data: { recorded: true }, meta: { requestId: res.locals.requestId, durationMs: Math.round(performance.now() - res.locals.startedAt) } });
   });
 

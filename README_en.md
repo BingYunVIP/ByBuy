@@ -9,6 +9,7 @@
 - **Three-step top-up**: check the subscription (paste your Session JSON and let the server verify it online) → validate the redemption code → submit. 3D Secure, when required, completes inline.
 - **Order tracking**: look up progress with the original code (pending / processing / completed / incomplete); in-progress orders refresh automatically.
 - **Subscription check**: personal Free accounts only — a short-lived credential is issued after the server confirms `personal + free` online.
+- **Masked logs**: ChatGPT and Team card checks, queries, submissions, and redemptions are all logged, told apart by the `service` field. Cards appear only as a salted short fingerprint, emails are masked, IPs keep two segments, and passwords, tokens, and Sessions are never written.
 - **Privacy**: the Session is verified in memory and forwarded to the top-up service only. It is never stored or logged, and the browser clears it right after submission.
 - **Interface**: Chinese and English, light and dark themes, language follows the browser automatically, responsive on mobile.
 
@@ -63,6 +64,7 @@ Production configuration lives in `.env`, excluded from version control (permiss
 | `Team_Web` | HTTPS origin for the Team redemption proxy | unset (Team redemption shows as unavailable) |
 | `TEAM_REDEEM_TIMEOUT_MS` | Team request timeout in milliseconds | `15000` |
 | `LOG_LEVEL` | `debug` / `info` / `warn` / `error` / `silent` | `info` |
+| `LOG_SALT` | Salt for card fingerprints. Set it to keep one card's log lines linkable across restarts; empty means a new random salt on every start | empty |
 | `SERVICE_DIAGNOSTICS` | Whether to log additional diagnostic metadata | `0` |
 | `UPSTREAM_CONCURRENCY` | Per-process cap on concurrent remote requests | `8` |
 | `UPSTREAM_QUEUE` | Maximum wait queue for the concurrency gate | `100` |
