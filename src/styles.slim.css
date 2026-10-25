@@ -1,0 +1,88 @@
+/* ==========================================================================
+   ByBuy — 精简版布局补充样式
+   由 App.tsx 引入。**只新增类名**（hero--slim / hero-slim / hero-chips /
+   page-shell），不覆盖基础样式表里的任何选择器，
+   所以无论两个 CSS 文件的打包顺序如何，结果都一致。
+   ========================================================================== */
+
+/* ------------------------------------------- hero：只留标题 + 关键词胶囊 */
+
+/* 基础样式里的光晕是偏左的（at 18%），居中的精简版 hero 需要把它移到中间。
+   .hero.hero--slim::before 的权重高于 .hero::before，所以能稳定覆盖。 */
+.hero.hero--slim::before {
+  background: radial-gradient(56rem 24rem at 50% -9rem, rgb(37 99 235 / 9%), transparent 68%);
+}
+:root[data-theme='dark'] .hero.hero--slim::before {
+  background: radial-gradient(56rem 24rem at 50% -9rem, rgb(96 165 250 / 13%), transparent 68%);
+}
+
+.hero-slim {
+  position: relative;          /* 保证内容压在 ::before 光晕之上 */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22px;
+  text-align: center;
+}
+
+.hero-slim h1 {
+  font-size: var(--fs-h1);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+/* 两组各占一行：服务保障在上，套餐价格在下。 */
+.hero-chip-groups {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+}
+
+/* 关键词胶囊：图标用品牌色，整体是苹果 HIG 那种克制的圆角浅底 */
+.hero-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 9px 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hero-chips li {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px 7px 11px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: var(--fs-small);
+  font-weight: 550;
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow: var(--shadow-xs);
+  transition: border-color 140ms, color 140ms, box-shadow 140ms;
+}
+.hero-chips li:hover {
+  border-color: var(--border-2);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+.hero-chips li svg { width: 15px; height: 15px; color: var(--brand); }
+
+/* ----------------------------------------------- 订单查询页的底部留白 */
+/* 页脚删掉后，订单页会直接贴到浏览器底部，补一点呼吸空间。 */
+
+.page-shell { padding-bottom: 64px; }
+
+@media (max-width: 640px) {
+  .hero.hero--slim { padding: 36px 0 26px; }
+  .hero-slim { gap: 18px; }
+  .hero-chips { gap: 8px; }
+  .hero-chips li { padding: 6px 11px 6px 9px; font-size: 12.5px; }
+  .page-shell { padding-bottom: 40px; }
+}

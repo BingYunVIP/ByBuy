@@ -1,0 +1,8 @@
+buy.bingyun.vip {
+    encode zstd gzip
+    reverse_proxy 127.0.0.1:2254 {
+        transport http {
+            response_header_timeout 70s
+        }
+    }
+}

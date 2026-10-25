@@ -1,0 +1,117 @@
+/* ==========================================================================
+   ByBuy — 动效层（styles.motion.css）
+   由 App.tsx 引入，排在 styles.slim.css 之后、styles.css 之前。
+
+   两条硬规矩：
+   1. 只动 transform / opacity（走合成层，不触发重排重绘），
+      唯一例外是几个几像素大的元素上的 box-shadow 呼吸灯。
+   2. 只要碰了 styles.css 里已存在的选择器，就把权重提到 (0,2,0) 以上，
+      否则 styles.css 后加载会把它盖掉。
+   ========================================================================== */
+
+@keyframes bb-rise { from { opacity: 0; transform: translate3d(0, 10px, 0); } }
+@keyframes bb-pop { from { opacity: 0; transform: translate3d(0, 8px, 0) scale(0.94); } }
+@keyframes bb-draw { from { transform: scaleX(0); } }
+@keyframes bb-sweep { from { transform: translate3d(-100%, 0, 0); } }
+@keyframes bb-ambient { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+@keyframes bb-ring {
+  0% { transform: scale(0.86); opacity: 0.85; }
+  70%, 100% { transform: scale(1.4); opacity: 0; }
+}
+@keyframes bb-breathe {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--brand) 30%, transparent); }
+  55% { box-shadow: 0 0 0 8px color-mix(in srgb, var(--brand) 0%, transparent); }
+}
+
+/* ------------------------------------------------------------ 进入动效 */
+
+.bb-rise { animation: bb-rise 460ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.bb-pop { animation: bb-pop 420ms cubic-bezier(0.34, 1.42, 0.64, 1) both; }
+
+/* 步骤面板切换时重播一次进入动效（key 变化会让 DOM 重新挂载） */
+.step-pane { animation: bb-rise 340ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* ------------------------------------------------- 加载骨架（替代白屏） */
+
+.result-pending {
+  display: grid;
+  gap: 12px;
+  margin-top: 22px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.skeleton-bar {
+  position: relative;
+  display: block;
+  height: 44px;
+  border-radius: var(--radius);
+  background: var(--surface-3);
+  overflow: hidden;
+}
+.skeleton-bar:last-child { height: 22px; width: 58%; }
+
+.skeleton-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 45%), transparent);
+  animation: bb-sweep 1.15s ease-in-out infinite;
+}
+:root[data-theme='dark'] .skeleton-bar::after {
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 6%), transparent);
+}
+
+/* -------------------------------------------------------- hero 环境光晕 */
+
+/* 只改透明度，不改几何形状 —— ::before 是 inset: -64px 0 auto 铺满整宽的，
+   一旦做位移/缩放就会把页面顶出横向滚动条。 */
+.hero.hero--slim::before { animation: bb-ambient 9s ease-in-out infinite; }
+
+/* --------------------------------------------- 步骤条：当前步的呼吸光环 */
+
+.steps .current .step-circle { position: relative; }
+.steps .current .step-circle::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border: 2px solid color-mix(in srgb, var(--brand) 42%, transparent);
+  border-radius: 50%;
+  animation: bb-ring 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+/* 圆圈颜色变化别是硬切 */
+.step-circle { transition: background-color 200ms, color 200ms, border-color 200ms; }
+
+/* 步骤从 4 个减到 3 个，基础表里写死的 4 列要改掉（提权覆盖） */
+.flow-card > .steps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+/* ---------------------------------------------------------- 按钮反馈 */
+
+.primary-button,
+.secondary-button { transition: transform 150ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 150ms, background-color 150ms, border-color 150ms; }
+.primary-button:not(:disabled):hover,
+.secondary-button:not(:disabled):hover { transform: translateY(-1px); }
+.primary-button:not(:disabled):active,
+.secondary-button:not(:disabled):active { transform: translateY(0) scale(0.985); }
+
+.icon-button,
+.language-button { transition: background-color 150ms, color 150ms, transform 150ms; }
+.icon-button:active,
+.language-button:active { transform: scale(0.94); }
+
+/* 顶栏投影挂在胶囊 .header-content 上（见 styles.css）。
+   整条 header 现在是透明的，再给它加投影会变成一条悬空的黑带。 */
+.header-content { transition: box-shadow 200ms, border-color 200ms; }
+
+/* ------------------------------------------------------ 无障碍：动效降级 */
+
+/* styles.css 末尾已经有一条全局 `animation: none !important`，
+   这里再写一份是为了让本文件的意图自成一体，不依赖别处的兜底。 */
+@media (prefers-reduced-motion: reduce) {
+  .bb-rise,
+  .bb-pop,
+  .step-pane,
+  .skeleton-bar::after,
+  .hero.hero--slim::before,
+  .steps .current .step-circle::after { animation: none !important; }
+}

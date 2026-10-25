@@ -1,0 +1,286 @@
+/* --------------------------------------------------------------------------
+   Shared product surface
+
+   The Team redeem page is the visual reference for both business routes:
+   centered hero, blue route switch, black keyline, solid offset shadow and
+   generous mobile spacing.  These selectors are scoped so legacy form rules
+   remain useful inside the flow while every visible page shares one surface.
+   -------------------------------------------------------------------------- */
+
+.product-page {
+  min-height: calc(100vh - var(--header-h));
+  min-height: calc(100dvh - var(--header-h));
+  padding: 18px max(18px, 3vw) 56px;
+  background: var(--page-bg);
+  color: #0f172a;
+}
+
+/* Shared hand pointer: Twemoji's exact 👉 artwork avoids platform-dependent
+   tofu boxes while keeping the requested right-pointing hand appearance. */
+.guide-pointer {
+  width: 28px;
+  height: 28px;
+  font-size: 0;
+  line-height: 1;
+  background: url('/icons/point-right.svg') center / contain no-repeat;
+}
+
+.task-section .session-guide a > span.guide-pointer {
+  width: 22px;
+  height: 22px;
+  font-size: 0;
+  background: url('/icons/point-right.svg') center / contain no-repeat;
+}
+
+/* The header status uses the same two-pixel keyline and offset shadow as the
+   shared product cards, while the semantic state remains color-coded. */
+.header-settings .service-status {
+  height: 32px;
+  padding-inline: 10px;
+  border: 2px solid #000;
+  background: #fff;
+  color: #0f172a;
+  box-shadow: 2px 2px 0 #000;
+}
+.header-settings .service-status--online { border-color: #000; background: #dcfce7; color: #166534; }
+.header-settings .service-status--offline { border-color: #000; background: #fee2e2; color: #991b1b; }
+.header-settings .service-status--checking { border-color: #000; background: #dbeafe; color: #1e3a8a; }
+.header-settings .service-status .status-dot { box-shadow: none; }
+.header-settings .service-status--online .status-dot { background: #16a34a; }
+.header-settings .service-status--offline .status-dot { background: #dc2626; }
+.header-settings .service-status--checking .status-dot { background: #2563eb; }
+
+:root[data-theme='dark'] .header-settings .service-status { background: #fff; color: #0f172a; }
+:root[data-theme='dark'] .header-settings .service-status--online { background: #dcfce7; color: #166534; }
+:root[data-theme='dark'] .header-settings .service-status--offline { background: #fee2e2; color: #991b1b; }
+:root[data-theme='dark'] .header-settings .service-status--checking { background: #dbeafe; color: #1e3a8a; }
+
+.product-page .container {
+  width: min(100%, var(--product-max));
+  max-width: var(--product-max);
+  padding-inline: 0;
+}
+
+.product-page .hero.hero--slim {
+  padding: 12px 0 16px;
+  background: transparent;
+}
+
+.product-page .hero.hero--slim::before { display: none; }
+
+.product-page .hero-slim {
+  gap: 24px;
+  align-items: center;
+}
+
+.product-page .route-switch-row,
+.product-page .order-route-switch {
+  margin: 0 auto 24px;
+}
+
+.product-page .product-switch-center {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: min(100%, 360px);
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 2px solid #000;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 3px 3px 0 #000;
+}
+
+.product-page .product-switch-center button {
+  width: 100%;
+  min-height: 42px;
+  padding-inline: 17px;
+  border-radius: 0;
+  color: #475569;
+}
+
+.product-page .product-switch-center button.active {
+  background: #58affa;
+  color: #000;
+  box-shadow: none;
+  transform: none;
+}
+
+.product-page .hero-slim h1,
+.product-page .page-intro h1 {
+  margin: 0;
+  color: #0f172a;
+  font-size: clamp(28px, 3.4vw, 44px);
+  font-weight: 900;
+  line-height: 1.05;
+  letter-spacing: -.055em;
+  text-align: center;
+}
+
+.product-page .hero-chips--services {
+  width: 100%;
+  margin: 0 auto;
+  gap: 9px;
+}
+
+.product-page .hero-chips--services li {
+  border: 2px solid #000;
+  background: #fff;
+  color: #0f172a;
+  box-shadow: 2px 2px 0 #000;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.product-page .hero-chips--services li:nth-child(2n) { background: #dbeafe; }
+.product-page .hero-chips--services li svg { width: 15px; height: 15px; }
+
+.product-page .task-section {
+  padding: 0;
+}
+
+.product-page .notice-board {
+  margin: 12px 0 16px;
+  padding: 18px 20px 20px;
+  border: 2px solid #000;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 4px 4px 0 #000;
+}
+
+.product-page .notice-board-head { margin-bottom: 14px; }
+.product-page .notice-board-head > svg { color: #2563eb; }
+.product-page .notice-board-head h2 { color: #0f172a; font-weight: 900; }
+.product-page .notice-board-head p { color: #475569; }
+
+.product-page .notice-group {
+  border: 2px solid #000;
+  border-radius: 14px;
+  box-shadow: 2px 2px 0 #000;
+}
+
+.product-page .flow-card {
+  overflow: hidden;
+  border: 2px solid #000;
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 6px 6px 0 #000;
+}
+
+.product-page .steps {
+  border-bottom: 2px solid #000;
+  background: #dbeafe;
+}
+
+.product-page .steps .current button { color: #1d4ed8; }
+.product-page .steps button { color: #475569; }
+.product-page .steps button:disabled { opacity: 1; }
+.product-page .steps .current .step-circle { background: #58affa; border-color: #000; color: #000; }
+.product-page .steps .done .step-circle { border-color: #000; background: #dcfce7; color: #166534; }
+
+.product-page .flow-body { padding: clamp(20px, 4vw, 42px); }
+.product-page .session-guide,
+.product-page .loaded-file,
+.product-page textarea,
+.product-page .code-input,
+.product-page .account-select select {
+  border: 2px solid #000;
+  border-radius: 15px;
+  background: #f8fafc;
+  box-shadow: 2px 2px 0 #000;
+}
+
+.product-page .session-guide { margin-bottom: 22px; }
+.product-page .session-guide a { color: #1d4ed8; }
+.product-page .session-guide p,
+.product-page .form-bottom > span,
+.product-page .field-note { color: #475569; }
+.product-page .form-label-row label,
+.product-page .card-field > label,
+.product-page .account-select label { color: #0f172a; }
+.product-page .text-button { color: #1d4ed8; }
+.product-page textarea:focus,
+.product-page .code-input:focus-within { border-color: #2563eb; box-shadow: 2px 2px 0 #000; }
+.product-page .primary-button,
+.product-page .secondary-button {
+  border: 2px solid #000;
+  border-radius: 13px;
+  box-shadow: 3px 3px 0 #000;
+  font-weight: 850;
+}
+
+.product-page .primary-button { background: #58affa; color: #000; }
+.product-page .primary-button:hover { background: #7cc4ff; }
+.product-page .secondary-button { background: #f1f5f9; color: #000; }
+.product-page .notice { border-width: 2px; }
+
+.product-page .page-intro {
+  max-width: none;
+  padding: 0 0 18px;
+  text-align: center;
+}
+
+.product-page .order-route-switch { margin-bottom: 24px; }
+/* 订单页没有 hero，补上和另外两页一致的顶部留白与标题间距。 */
+.order-page .page-shell { padding-top: 12px; }
+.order-page .page-intro { padding-bottom: 24px; }
+.product-page .order-card { max-width: none; padding: clamp(20px, 4vw, 42px); }
+.product-page .order-card form > .primary-button { min-height: 52px; margin-top: 20px; }
+.product-page .order-result { border-top: 2px solid #e2e8f0; }
+.product-page .order-headline,
+.product-page .order-facts { border-width: 2px; border-color: #000; box-shadow: 2px 2px 0 #000; }
+
+/* ---- 随浏览器宽高自适应 ----
+   宽度：容器宽度见 --product-max（styles.css），卡片内边距随宽度缩放。
+   高度：不强行撑高卡片（内容少时会留一大片空白），而是让输入框、按钮和
+   间距按窗口高度（dvh）放大缩小；dvh 在手机浏览器地址栏伸缩时也不会错位。 */
+.product-page .notice-board { padding: clamp(16px, 1.6vw, 26px) clamp(16px, 2.4vw, 36px) clamp(18px, 1.8vw, 28px); margin-bottom: clamp(14px, 2dvh, 24px); }
+.product-page .flow-body,
+.product-page .redeem-card { padding: clamp(20px, 3.2vw, 48px); }
+.product-page .flow-card textarea { height: clamp(180px, 30dvh, 360px); max-height: none; }
+.product-page .form-bottom { margin-top: clamp(16px, 2.2dvh, 28px); }
+.product-page .redeem-tab { min-height: clamp(66px, 8dvh, 84px); }
+.product-page .panel-heading { padding-bottom: clamp(21px, 2.6dvh, 32px); }
+.product-page .form-fields { gap: clamp(16px, 2dvh, 24px); margin-top: clamp(22px, 3dvh, 36px); }
+.product-page .neo-input-wrap { min-height: clamp(54px, 6.4dvh, 68px); }
+.product-page .redeem-submit { min-height: clamp(56px, 7dvh, 72px); margin-top: clamp(22px, 3.2dvh, 40px); }
+
+/* The status notice is part of the same card language when a probe fails. */
+.product-page .service-notice {
+  margin: 0 0 14px;
+  border: 2px solid #000;
+  border-radius: 16px;
+  box-shadow: 3px 3px 0 #000;
+}
+
+:root[data-theme='dark'] .product-page {
+  background: var(--page-bg);
+  color: #e5edf7;
+}
+
+:root[data-theme='dark'] .product-page .hero-slim h1,
+:root[data-theme='dark'] .product-page .page-intro h1 { color: #e5edf7; }
+
+@media (max-width: 640px) {
+  .product-page { padding: 10px 14px 40px; }
+  .product-page .flow-card textarea { height: 168px; }
+
+  .product-page .container { padding-inline: 0; }
+
+  .product-page .hero.hero--slim { padding: 18px 0 12px; }
+  .product-page .hero-slim { gap: 18px; }
+  .product-page .product-switch-center button { min-height: 40px; padding-inline: 10px; font-size: 12px; }
+  .product-page .hero-slim h1,
+  .product-page .page-intro h1 { font-size: 30px; }
+  .product-page .hero-chips--services li { padding: 7px 9px; font-size: 11px; }
+  .header-settings .service-status { padding-inline: 8px; }
+  .header-settings .service-status .status-prefix { display: none; }
+  .product-page .notice-board { padding: 16px; }
+  .product-page .flow-body,
+  .product-page .redeem-card,
+  .product-page .order-card { padding: 18px 14px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .product-page .product-switch button { transition: none; }
+}
