@@ -109,7 +109,10 @@
 .team-result > svg { color: #059669; }
 .team-result h3 { margin: 0; color: #0f172a; font-size: 22px; font-weight: 950; }
 .team-result > p { margin: 0; color: #475569; font-size: 14px; }
-.team-next-steps { width: min(100%, 560px); padding: 14px 16px; border: 2px solid #000; border-radius: 14px; background: #fffbeb; color: #451a03; font-size: 13px; line-height: 1.7; text-align: left; box-shadow: 2px 2px 0 #000; }
+.team-next-steps { width: 100%; padding: 14px 16px; border: 2px solid #000; border-radius: 14px; background: #fffbeb; color: #451a03; font-size: 14px; line-height: 1.8; text-align: center; box-shadow: 2px 2px 0 #000; }
+.team-next-steps b { display: block; font-size: 14px; }
+.team-next-steps ol { display: inline-block; margin: 6px 0 0; padding-left: 22px; text-align: left; }
+.team-next-steps li { padding-left: 2px; }
 .account-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; gap: 11px; margin: 5px 0 0; text-align: left; }
 .account-facts > div { min-width: 0; padding: 13px; border: 2px solid #000; border-radius: 13px; background: #f8fafc; box-shadow: 2px 2px 0 #000; }
 .account-facts dt { color: #64748b; font-size: 11px; font-weight: 800; }

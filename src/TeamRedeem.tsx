@@ -183,7 +183,9 @@ export default function TeamRedeem({ onNavigateProduct }: TeamRedeemProps) {
 
         {result === 'invite' ? <section className="team-result team-result--invite" role="status" aria-live="polite">
           <CircleCheck size={40} aria-hidden="true" /><h3>{zh ? '兑换成功！' : 'Redemption successful'}</h3><p>{zh ? '团队邀请已成功提交，请检查邮箱。' : 'The team invite was submitted. Check your email.'}</p>
-          <div className="team-next-steps"><b>{zh ? '下一步操作指引：' : 'Next steps:'}</b><br />{zh ? '1. 查收来自 OpenAI 的团队邀请邮件；2. 点击邮件内的 Join Workspace；3. 若未收到，请检查垃圾邮件。' : '1. Find the OpenAI team invite; 2. click Join Workspace; 3. check spam if it is missing.'}</div>
+          <div className="team-next-steps"><b>{zh ? '下一步操作指引' : 'Next steps'}</b><ol>{(zh
+            ? ['查收来自 OpenAI 的团队邀请邮件。', '点击邮件内的 Join Workspace。', '若未收到，请检查垃圾邮件。']
+            : ['Find the OpenAI team invite email.', 'Click Join Workspace in the email.', 'Check your spam folder if it is missing.']).map(step => <li key={step}>{step}</li>)}</ol></div>
           <button type="button" className="neo-btn redeem-secondary" onClick={reset}><RotateCcw size={16} aria-hidden="true" />{zh ? '兑换另一个卡密' : 'Redeem another code'}</button>
         </section> : result === 'ready' && account ? <section className="team-result team-result--ready" role="status" aria-live="polite">
           <CircleCheck size={40} aria-hidden="true" /><h3>{zh ? '账号出库成功！' : 'Account delivered'}</h3><p>{zh ? '请妥善保存以下登录交付信息。' : 'Save the login details below securely.'}</p>
