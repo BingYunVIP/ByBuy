@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import {
-  AtSign, CircleAlert, CircleCheck, Copy, Gift, KeyRound, LoaderCircle, Mail, RefreshCw, RotateCcw,
-  ShieldCheck,
+  AtSign, CircleCheck, Copy, Gift, KeyRound, LoaderCircle, Mail, RefreshCw, RotateCcw,
 } from 'lucide-react';
+import Alert from './Alert';
 import { useLocale } from './locale';
 import ProductSwitch from './ProductSwitch';
 import type { ProductPage } from './ProductSwitch';
@@ -138,7 +138,7 @@ export default function TeamRedeem({ onNavigateProduct }: TeamRedeemProps) {
       try { setAvailability(await fetchJson<Availability>('/api/team/availability', undefined, 8_000)); }
       catch { /* The completed redemption stays visible even when inventory refresh is unavailable. */ }
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : (zh ? '兑换失败，请稍后重试。' : 'Redemption failed. Try again later.'));
+      setError(submitError instanceof Error ? submitError.message : (zh ? '兑换失败，请您联系网站客服协助处理。' : 'Redemption failed, please contact website support for help.'));
     } finally { setBusy(false); }
   }
 
@@ -182,7 +182,7 @@ export default function TeamRedeem({ onNavigateProduct }: TeamRedeemProps) {
         <h2 className="sr-only" id="redeem-method-title">{mode === 'invite' ? (zh ? '自备账号拉人上车' : 'Invite your email') : (zh ? '现成独立成品号提卡' : 'Claim a ready account')}</h2>
 
         {result === 'invite' ? <section className="team-result team-result--invite" role="status" aria-live="polite">
-          <CircleCheck size={40} aria-hidden="true" /><h3>{zh ? '兑换成功！' : 'Redemption successful'}</h3><p>{zh ? '团队邀请已成功提交，请检查邮箱。' : 'The team invite was submitted. Check your email.'}</p>
+          <CircleCheck size={40} aria-hidden="true" /><h3>{zh ? '兑换成功！' : 'Redemption successful'}</h3>
           <div className="team-next-steps"><b>{zh ? '下一步操作指引' : 'Next steps'}</b><ol>{(zh
             ? ['查收来自 OpenAI 的团队邀请邮件。', '点击邮件内的 Join Workspace。', '若未收到，请检查垃圾邮件。']
             : ['Find the OpenAI team invite email.', 'Click Join Workspace in the email.', 'Check your spam folder if it is missing.']).map(step => <li key={step}>{step}</li>)}</ol></div>
@@ -193,13 +193,12 @@ export default function TeamRedeem({ onNavigateProduct }: TeamRedeemProps) {
           <p className="account-note">{zh ? '请将 2FA 密钥保存到您信任的验证器中。' : 'Save the 2FA secret in a trusted authenticator.'}</p>
           <div className="result-actions"><button type="button" className="neo-btn redeem-primary" onClick={() => void copyAccount()}><Copy size={16} aria-hidden="true" />{copied ? (zh ? '已复制到剪贴板' : 'Copied') : (zh ? '一键复制全部账号信息' : 'Copy account details')}</button><button type="button" className="neo-btn redeem-secondary" onClick={reset}><RotateCcw size={16} aria-hidden="true" />{zh ? '兑换另一个卡密' : 'Redeem another code'}</button></div>
         </section> : <section className="team-form-panel">
-          <div className="panel-heading"><span className="panel-icon" aria-hidden="true">{mode === 'invite' ? <Mail size={21} /> : <Gift size={21} />}</span><div><h3>{mode === 'invite' ? (zh ? '自备账号拉人上车' : 'Invite your own account') : (zh ? '现成独立成品号提卡' : 'Claim a ready account')}</h3><p>{mode === 'invite' ? (zh ? '输入您的 ChatGPT 注册邮箱，系统确认后发送团队邀请。' : 'Enter your ChatGPT registration email to receive the team invite.') : (zh ? '无需提供账号，输入卡密即刻出库独立配置好的账号。' : 'No email is needed; a configured account is delivered after redemption.')}</p></div></div>
           <form onSubmit={event => { event.preventDefault(); void submit(); }}>
             <div className={`form-fields${mode === 'ready' ? ' form-fields--single' : ''}`}>
               <label htmlFor="team-cdk"><span>{zh ? '卡密 (CDK)' : 'Code (CDK)'}</span><div className="neo-input-wrap"><KeyRound size={17} aria-hidden="true" /><input id="team-cdk" value={cdk} onChange={event => setCdk(event.target.value.toUpperCase())} placeholder={zh ? '例如：TEAM-XXXXXXXX-XXXXXXXX' : 'e.g. TEAM-XXXXXXXX-XXXXXXXX'} autoComplete="off" disabled={busy || locked} /></div></label>
-              {mode === 'invite' ? <label htmlFor="team-email"><span>{zh ? '您的 ChatGPT 账号邮箱' : 'ChatGPT account email'}</span><div className="neo-input-wrap"><AtSign size={17} aria-hidden="true" /><input id="team-email" type="email" value={email} onChange={event => setEmail(event.target.value)} placeholder="your_email@example.com" autoComplete="email" disabled={busy || locked} /></div></label> : <div className="form-hint"><ShieldCheck size={18} aria-hidden="true" /><span>{zh ? '无需提供邮箱，提交后会展示现成账号的登录信息。' : 'No email is required. Login details appear after submission.'}</span></div>}
+              {mode === 'invite' ? <label htmlFor="team-email"><span>{zh ? '您的 ChatGPT 账号邮箱' : 'ChatGPT account email'}</span><div className="neo-input-wrap"><AtSign size={17} aria-hidden="true" /><input id="team-email" type="email" value={email} onChange={event => setEmail(event.target.value)} placeholder="your_email@example.com" autoComplete="email" disabled={busy || locked} /></div></label> : null}
             </div>
-            {error ? <p className="team-error" role="alert"><CircleAlert size={17} aria-hidden="true" />{error}</p> : null}
+            {error ? <Alert tone="error">{error}</Alert> : null}
             <button type="submit" className="neo-btn redeem-primary redeem-submit" disabled={busy || locked}>{busy ? <LoaderCircle className="spinner" size={18} aria-hidden="true" /> : mode === 'invite' ? <Mail size={18} aria-hidden="true" /> : <Gift size={18} aria-hidden="true" />}{busy ? (zh ? '正在处理…' : 'Processing…') : mode === 'invite' ? (zh ? '立即兑换并拉入团队空间' : 'Redeem and join team') : (zh ? '立即核销并提取成品账号' : 'Redeem and receive account')}</button>
           </form>
         </section>}

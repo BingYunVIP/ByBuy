@@ -31,9 +31,9 @@ function safeText(value, fallback) {
 
 async function readJson(response) {
   const type = response.headers.get('content-type') || '';
-  if (!type.includes('application/json')) throw new PublicError(502, 'TEAM_RESPONSE', 'Team 兑换服务返回异常，请稍后重试。');
+  if (!type.includes('application/json')) throw new PublicError(502, 'TEAM_RESPONSE', 'Team 兑换服务返回异常，请您联系网站客服协助处理。');
   const reader = response.body?.getReader();
-  if (!reader) throw new PublicError(502, 'TEAM_RESPONSE', 'Team 兑换服务返回异常，请稍后重试。');
+  if (!reader) throw new PublicError(502, 'TEAM_RESPONSE', 'Team 兑换服务返回异常，请您联系网站客服协助处理。');
   const chunks = [];
   let length = 0;
   try {
@@ -43,7 +43,7 @@ async function readJson(response) {
       length += value.byteLength;
       if (length > 128 * 1024) {
         await reader.cancel();
-        throw new PublicError(502, 'TEAM_RESPONSE', 'Team 兑换服务返回异常，请稍后重试。');
+        throw new PublicError(502, 'TEAM_RESPONSE', 'Team 兑换服务返回异常，请您联系网站客服协助处理。');
       }
       chunks.push(value);
     }
@@ -52,7 +52,7 @@ async function readJson(response) {
     return body;
   } catch (error) {
     if (error instanceof PublicError || error?.name === 'AbortError' || error?.name === 'TimeoutError') throw error;
-    throw new PublicError(502, 'TEAM_RESPONSE', 'Team 兑换服务返回异常，请稍后重试。');
+    throw new PublicError(502, 'TEAM_RESPONSE', 'Team 兑换服务返回异常，请您联系网站客服协助处理。');
   } finally {
     reader.releaseLock();
   }
@@ -96,7 +96,7 @@ export function createTeamRedeem({ origin = process.env.Team_Web, timeoutMs = po
   let statusInflight = null;
 
   async function request(path, { method = 'GET', body } = {}) {
-    if (!target) throw new PublicError(503, 'TEAM_NOT_CONFIGURED', 'Team 兑换服务暂未开放，请稍后再试。');
+    if (!target) throw new PublicError(503, 'TEAM_NOT_CONFIGURED', 'Team 兑换服务暂未开放，请您联系网站客服协助处理。');
     let response;
     try {
       response = await fetchImpl(new URL(path, target), {
@@ -107,20 +107,20 @@ export function createTeamRedeem({ origin = process.env.Team_Web, timeoutMs = po
         signal: AbortSignal.timeout(timeoutMs),
       });
     } catch (error) {
-      if (error?.name === 'TimeoutError' || error?.name === 'AbortError') throw new PublicError(504, 'TEAM_TIMEOUT', 'Team 兑换服务响应超时，请保留卡密和当前页面，勿重复提交。', Boolean(body));
-      throw new PublicError(502, 'TEAM_UNAVAILABLE', body ? 'Team 兑换结果暂时无法确认，请保留卡密和当前页面，勿重复提交。' : 'Team 兑换服务暂时不可用，请稍后重试。', Boolean(body));
+      if (error?.name === 'TimeoutError' || error?.name === 'AbortError') throw new PublicError(504, 'TEAM_TIMEOUT', 'Team 兑换服务响应超时，请保留卡密和当前页面，勿重复提交，请您联系网站客服协助处理。', Boolean(body));
+      throw new PublicError(502, 'TEAM_UNAVAILABLE', body ? 'Team 兑换结果暂时无法确认，请保留卡密和当前页面，勿重复提交，请您联系网站客服协助处理。' : 'Team 兑换服务暂时不可用，请您联系网站客服协助处理。', Boolean(body));
     }
     let data;
     try { data = await readJson(response); }
     catch (error) {
       if (error?.name === 'TimeoutError' || error?.name === 'AbortError') {
-        throw new PublicError(504, 'TEAM_TIMEOUT', 'Team 兑换服务响应超时，请保留卡密和当前页面，勿重复提交。', Boolean(body));
+        throw new PublicError(504, 'TEAM_TIMEOUT', 'Team 兑换服务响应超时，请保留卡密和当前页面，勿重复提交，请您联系网站客服协助处理。', Boolean(body));
       }
       if (error instanceof PublicError && body && error.status >= 500) throw new PublicError(error.status, error.code, error.message, true);
       throw error;
     }
     if (!response.ok) {
-      const detail = safeText(data.detail, safeText(data.msg, 'Team 兑换暂未完成，请稍后重试。'));
+      const detail = safeText(data.detail, safeText(data.msg, 'Team 兑换暂未完成，请您联系网站客服协助处理。'));
       if (response.status === 409) throw new PublicError(409, 'TEAM_PENDING', detail, true);
       if (response.status === 429) throw new PublicError(503, 'TEAM_BUSY', '当前兑换人数较多，请稍后重试。');
       throw new PublicError(response.status >= 500 ? 502 : 400, 'TEAM_REJECTED', detail, Boolean(body) && response.status >= 500);
@@ -156,13 +156,13 @@ export function createTeamRedeem({ origin = process.env.Team_Web, timeoutMs = po
       const invite = data.invite_seats_remaining;
       const ready = data.ready_accounts_remaining;
       if (!Number.isSafeInteger(invite) || invite < 0 || !Number.isSafeInteger(ready) || ready < 0) {
-        throw new PublicError(502, 'TEAM_RESPONSE', '库存信息暂时无法读取，请稍后重试。');
+        throw new PublicError(502, 'TEAM_RESPONSE', '库存信息暂时无法读取，请您联系网站客服协助处理。');
       }
       return { inviteSeatsRemaining: invite, readyAccountsRemaining: ready };
     },
     async invite(input) {
       const data = await request('api/cdk/redeem/invite', { method: 'POST', body: readInvite(input) });
-      if (data.status !== 'success') throw new PublicError(502, 'TEAM_RESPONSE', 'Team 邀请结果暂时无法确认，请稍后查询。', true);
+      if (data.status !== 'success') throw new PublicError(502, 'TEAM_RESPONSE', 'Team 邀请结果暂时无法确认，请勿重复提交，请您联系网站客服协助处理。', true);
       return { status: 'success' };
     },
     async ready(input) {
@@ -175,12 +175,12 @@ export function createTeamRedeem({ origin = process.env.Team_Web, timeoutMs = po
         throw new PublicError(409, 'TEAM_ALREADY_REDEEMED', `该卡密已经兑换过：团队邀请已发送${masked ? `到 ${masked}` : ''}，请前往邮箱查收邀请邮件，无需再次兑换。`);
       }
       if (data.status !== 'success' || !account || typeof account !== 'object' || Array.isArray(account)) {
-        throw new PublicError(502, 'TEAM_RESPONSE', '现成账号结果暂时无法确认，请稍后查询。', true);
+        throw new PublicError(502, 'TEAM_RESPONSE', '现成账号结果暂时无法确认，请勿重复提交，请您联系网站客服协助处理。', true);
       }
       const email = safeText(account.email, '');
       const password = safeText(account.password, '');
       const totpSecret = safeText(account.totp_secret, '');
-      if (!email || !password) throw new PublicError(502, 'TEAM_RESPONSE', '现成账号结果暂时无法确认，请稍后查询。', true);
+      if (!email || !password) throw new PublicError(502, 'TEAM_RESPONSE', '现成账号结果暂时无法确认，请勿重复提交，请您联系网站客服协助处理。', true);
       return { status: 'success', account: { email, password, totp_secret: totpSecret } };
     },
   };

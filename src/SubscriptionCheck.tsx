@@ -2,9 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, CircleCheck, FileJson, LoaderCircle, LockKeyhole, RefreshCw, Upload } from 'lucide-react';
 import { MAX_IMPORT_BYTES, parseSubscriptionInput, planLabel } from '../shared/subscription.ts';
 import type { LiveReport, ParsedAccount } from '../shared/subscription.ts';
+import OrderStatusCard from './OrderStatusCard';
 import { reportVerification, requestCard, runVerification, submitOrder } from './api';
-import type { CardResult, OrderResult, SubmissionResult } from './api';
+import type { CardResult, SubmissionResult } from './api';
 import CardField from './CardField';
+import Alert from './Alert';
 import { errorKey, useLocale } from './locale';
 import type { CopyKey } from './locale';
 import { ServiceNotice, useServiceStatus } from './service-status';
@@ -13,6 +15,8 @@ import { ServiceNotice, useServiceStatus } from './service-status';
    「提交信息」原本是第 3 步，但 Session JSON 在第 1 步就已经提交了，
    那一步纯属重复，已删除。 */
 const FLOW_STEPS = ['step1', 'step2', 'step4'] as const;
+
+const ORDER_POLL_MS = 5_000;
 
 export default function SubscriptionCheck({ onQuery }: { onQuery: (code: string) => void }) {
   const { t } = useLocale();
@@ -53,6 +57,18 @@ export default function SubscriptionCheck({ onQuery }: { onQuery: (code: string)
     const timeout = setTimeout(() => { setLive(value => value ? { ...value, eligibility: null } : null); setStep(1); setCard(null); setSubmission(null); setCode(''); setNotice('ticketExpired'); }, Math.max(0, remaining));
     return () => clearTimeout(timeout);
   }, [ticket]);
+
+  const polling = useRef<AbortController | null>(null);
+  useEffect(() => () => polling.current?.abort(), []);
+  useEffect(() => {
+    if (!submission || !['PENDING', 'PROCESSING'].includes(submission.status) || submission.verification || busy) return;
+    const timer = window.setTimeout(() => {
+      polling.current?.abort();
+      const next = new AbortController(); polling.current = next;
+      void refreshSubmission(code.trim().toUpperCase(), next.signal).catch(() => undefined);
+    }, ORDER_POLL_MS);
+    return () => window.clearTimeout(timer);
+  }, [submission, busy]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* 验证提示出现时回报一次（同一份验证信息只报一次，去重在 reportVerification 里）。 */
   const pendingVerification = submission?.verification ?? null;
@@ -142,6 +158,7 @@ export default function SubscriptionCheck({ onQuery }: { onQuery: (code: string)
       if (response.ok) {
         setSubmission(response.data);
         requestAnimationFrame(() => resultRef.current?.focus());
+        void refreshSubmission(code.trim().toUpperCase(), request.signal);
       } else {
         setSubmissionNotice(errorKey(response.error.code));
         setSubmissionCanQuery(response.error.canQuery);
@@ -150,6 +167,14 @@ export default function SubscriptionCheck({ onQuery }: { onQuery: (code: string)
     } finally {
       if (controller.current === request) { controller.current = null; setBusy(null); }
     }
+  }
+
+  /* 提交成功后在第三步里直接展示订单进度：先查一次拿到最新状态，处理中就继续轮询，
+     需要付款验证时停下来等用户操作。 */
+  async function refreshSubmission(orderCode: string, signal: AbortSignal) {
+    const response = await requestCard('query', orderCode, signal);
+    if (signal.aborted) return;
+    if (response.ok && response.data.kind === 'order') setSubmission({ ...response.data, verification: response.data.verification ?? null });
   }
 
   async function verifyPayment() {
@@ -177,10 +202,6 @@ export default function SubscriptionCheck({ onQuery }: { onQuery: (code: string)
     : ['pro', 'prolite', 'promax'].includes(current.plan) ? 'Pro'
       : current.plan === 'free' ? 'Free' : current.plan === 'plus' ? 'Plus' : planLabel(current.plan);
   const checking = busy === 'check';
-  const submissionStatus = (status: OrderResult['status']): CopyKey => status === 'COMPLETED' ? 'completed'
-    : status === 'PENDING' || status === 'PROCESSING' ? 'processing'
-      : status === 'UNKNOWN' ? 'submitted' : status === 'CANCELLED' ? 'cancelled' : 'failed';
-
   return <>
     <section className={`flow-card${locked ? ' flow-card--locked' : ''}`} aria-label={t('title')} aria-disabled={locked || undefined}>
       {locked ? <ServiceNotice /> : null}
@@ -210,32 +231,26 @@ export default function SubscriptionCheck({ onQuery }: { onQuery: (code: string)
             <div><dt>{t('plan')}</dt><dd>{displayPlan}</dd></div>
           </dl></div> : null}
 
-          {notice ? <p className={`notice bb-rise ${notice === 'eligible' ? 'success' : 'warning'}`} role="status">{notice === 'eligible' ? <CircleCheck size={16} /> : null}{t(notice)}</p> : null}
+          {notice ? <Alert tone={notice === 'eligible' ? 'success' : 'error'}>{t(notice)}</Alert> : null}
           {current ? <button className="primary-button continue-button" type="button" disabled={!canContinue || Boolean(busy)} onClick={() => { setStep(2); setNotice(null); }}>{t('next')}<ArrowRight size={16} /></button> : null}
         </div> : step === 2 ? <div className="step-pane" key="pane-2">
           <div className="stage-title"><h2>{t('step2')}</h2><span className="status-label positive"><Check size={12} />{t('personal')} · Free</span></div>
           <form onSubmit={event => { event.preventDefault(); void verify(); }} aria-busy={busy === 'card'}><CardField value={code} onChange={value => { setCode(value); setCard(null); setNotice(null); setUsedCard(false); }} disabled={Boolean(busy)} />
-            {notice ? <p className="notice bb-rise warning" role="alert">{t(notice)}{usedCard ? <button type="button" className="text-button" onClick={() => onQuery(code)}>{t('viewOrder')}<ArrowRight size={14} /></button> : null}</p> : null}
+            {notice ? <Alert tone="error">{t(notice)}{usedCard ? <button type="button" className="text-button" onClick={() => onQuery(code)}>{t('viewOrder')}<ArrowRight size={14} /></button> : null}</Alert> : null}
             <div className="stage-actions"><button className="text-button" type="button" onClick={() => { cancel(); setStep(1); setLive(null); setNotice(null); setCard(null); setCode(''); }}><ArrowLeft size={15} />{t('back')}</button><button className="primary-button" disabled={!canContinue || Boolean(busy)}>{busy === 'card' ? <LoaderCircle className="spinner" size={16} /> : null}{t(busy === 'card' ? 'verifying' : 'verify')}<ArrowRight size={16} /></button></div>
           </form>
         </div> : <div className="step-pane" key="pane-3">
           <div className="stage-title"><h2>{t('step4')}</h2><span className="status-label positive"><Check size={12} />{card?.plan ?? t('verified')}</span></div>
           {submission ? <>
-            <div className="verified-card bb-pop" tabIndex={-1} ref={resultRef} role="status"><CircleCheck size={24} /><div><h3>{t(submissionStatus(submission.status))}</h3><p>{t('submittedPending')}</p></div></div>
-            <div className="subscription-result bb-rise"><dl className="simple-results">
-              <div><dt>{t('account')}</dt><dd>{submission.accountMasked ?? '—'}</dd></div>
-              <div><dt>{t('status')}</dt><dd>{t(submissionStatus(submission.status))}</dd></div>
-            </dl></div>
-            {submission.verification ? <div className="notice bb-rise warning" role="alert">
-              <span>{t('completeVerification')}</span>
-              <button className="text-button" type="button" disabled={busy === 'verification'} onClick={() => void verifyPayment()}>{busy === 'verification' ? <LoaderCircle className="spinner" size={15} /> : <LockKeyhole size={15} />}{t(busy === 'verification' ? 'verifyingPayment' : 'completeVerification')}</button>
-            </div> : null}
-            {submissionNotice ? <p className="notice bb-rise warning" role="alert">{t(submissionNotice)}</p> : null}
+            <div tabIndex={-1} ref={resultRef}>
+              <OrderStatusCard result={submission} code={code} verificationBusy={busy === 'verification'} verificationError={null} onVerify={() => void verifyPayment()} />
+            </div>
+            {submissionNotice ? <Alert tone="error">{t(submissionNotice)}</Alert> : null}
             <div className="stage-actions"><button className="text-button" type="button" onClick={reset}><RefreshCw size={15} />{t('restart')}</button><button className="primary-button" type="button" onClick={() => onQuery(code)}>{t('viewOrder')}<ArrowRight size={16} /></button></div>
           </> : <>
             <div className="verified-card bb-pop" tabIndex={-1} ref={resultRef} role="status"><CircleCheck size={24} /><div><h3>{t('cardPassed')}</h3><p>{t('submissionSoon')}</p></div></div>
             <p className="field-note"><LockKeyhole size={13} />{t('submitPrivacy')}</p>
-            {submissionNotice ? <p className="notice bb-rise warning" role="alert">{t(submissionNotice)}</p> : null}
+            {submissionNotice ? <Alert tone="error">{t(submissionNotice)}</Alert> : null}
             <div className="stage-actions">
               <button className="text-button" type="button" onClick={submissionNotice ? reset : () => setStep(2)}><ArrowLeft size={15} />{t(submissionNotice ? 'restart' : 'back')}</button>
               {submissionCanQuery ? <button className="primary-button" type="button" onClick={() => onQuery(code)}>{t('viewOrder')}<ArrowRight size={16} /></button>

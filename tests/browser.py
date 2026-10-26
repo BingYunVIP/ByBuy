@@ -115,6 +115,7 @@ with sync_playwright() as p:
         assert page.locator('.team-page .hero-chips--services li svg').count()==7
         expect(page.get_by_text('Team 当成 Plus',exact=True)).to_be_visible()
         audit('team-empty')
+        page.screenshot(path=str(ARTIFACTS/'team-form.png'),full_page=True)
         page.get_by_role('button',name='切换深色模式',exact=True).click()
         audit('team-dark')
         page.get_by_role('button',name='切换浅色模式',exact=True).click()
@@ -125,11 +126,13 @@ with sync_playwright() as p:
         page.get_by_label('卡密 (CDK)',exact=True).fill('TEAM-TEST-123456')
         page.get_by_role('button',name='立即兑换并拉入团队空间',exact=True).click()
         expect(page.get_by_role('heading',name='兑换成功！',exact=True)).to_be_visible()
+        page.screenshot(path=str(ARTIFACTS/'team-invite-success.png'),full_page=True)
         page.get_by_role('button',name=re.compile('领取现成成品号')).click()
         page.get_by_label('卡密 (CDK)',exact=True).fill('TEAM-TEST-READY')
         page.get_by_role('button',name='立即核销并提取成品账号',exact=True).click()
         expect(page.get_by_role('heading',name='账号出库成功！',exact=True)).to_be_visible()
         expect(page.get_by_text('ready@example.test',exact=True)).to_be_visible()
+        page.screenshot(path=str(ARTIFACTS/'team-ready-success.png'),full_page=True)
         stored_team=page.evaluate('JSON.stringify({...localStorage,...sessionStorage})')
         assert 'private-ready-password' not in stored_team and 'private-totp-secret' not in stored_team
         assert not any('/team-redeem/api/' in url for url in requests)
@@ -192,21 +195,21 @@ with sync_playwright() as p:
         page.get_by_role('button',name='切换中文',exact=True).click()
 
         page.get_by_role('button',name='检查订阅',exact=True).click()
-        expect(page.get_by_role('status')).to_contain_text('完整、有效的 JSON')
+        expect(page.get_by_role('alert')).to_contain_text('完整、有效的 JSON')
         import_session()
         assert not any('/api/subscriptions/check' in url for url in requests)
         expect(page.get_by_role('button',name='2 验证卡密',exact=True)).to_be_disabled()
         assert page.locator('.subscription-result').count()==0
         page.route('**/api/subscriptions/check',reply(live(fail=True)))
         page.get_by_role('button',name='重新检查',exact=True).click()
-        expect(page.get_by_role('status')).to_contain_text('订阅查询服务访问受限')
+        expect(page.get_by_role('alert')).to_contain_text('订阅查询服务访问受限')
         expect(page.get_by_role('button',name='2 验证卡密',exact=True)).to_be_disabled()
         page.unroute('**/api/subscriptions/check')
 
         for plan,scope,message in [('plus','personal','请确保当前订阅已过期'),('pro','personal','请确保当前订阅已过期'),('free','workspace','请切换个人账号')]:
             page.route('**/api/subscriptions/check',reply(live(plan,scope)))
             page.get_by_role('button',name='重新检查',exact=True).click()
-            expect(page.get_by_role('status')).to_contain_text(message)
+            expect(page.get_by_role('alert')).to_contain_text(message)
             expect(page.get_by_role('button',name='下一步：验证卡密',exact=True)).to_be_disabled()
             page.unroute('**/api/subscriptions/check')
 
@@ -241,23 +244,33 @@ with sync_playwright() as p:
             assert route.request.post_data_json=={'code':'DEMO-TEST-CARD','sessionJson':json.dumps(fixture['session']),'contact':''}
             route.fulfill(status=200,content_type='application/json',body=json.dumps({'ok':True,'data':{'kind':'order','status':'PENDING','plan':'ChatGPT Plus','accountMasked':'s***@e***.test','orderNoMasked':'•••• 123456','createdAt':None,'processingAt':None,'completedAt':None,'updatedAt':None,'requiresVerification':True,'verification':{'mode':'stripe','publishableKey':'pk_test_browser123','clientSecret':'seti_browser_secret_123','expiresAt':'2027-01-01T00:00:00Z'}}}))
         page.route('**/api/orders/submit',submit)
+        verification={'mode':'stripe','publishableKey':'pk_test_browser123','clientSecret':'seti_browser_secret_123','expiresAt':'2027-01-01T00:00:00Z'}
+        def order_data(status,**extra):
+            data={'kind':'order','status':status,'plan':'ChatGPT Plus','accountMasked':'s***@e***.test','orderNoMasked':'•••• 123456','createdAt':'2026-10-11T11:00:00Z','processingAt':'2026-10-11T11:00:10Z','completedAt':None,'updatedAt':None,'requiresVerification':False,'verification':None}
+            data.update(extra)
+            return data
+        page.route('**/api/orders/query',lambda route: route.fulfill(status=200,content_type='application/json',body=json.dumps({'ok':True,'data':order_data('PROCESSING',requiresVerification=True,verification=verification)})))
+        # Submitting succeeds -> step 3 renders the order result in place (no navigation) and queries it right away.
         page.get_by_role('button',name='完成提交',exact=True).click()
+        expect(page).not_to_have_url(re.compile(r'/order'))
         expect(page.get_by_role('heading',name='充值处理中',exact=True)).to_be_visible()
         expect(page.get_by_text('s***@e***.test',exact=True)).to_be_visible()
-        page.route('**/api/orders/query',lambda route: route.fulfill(status=200,content_type='application/json',body=json.dumps({'ok':True,'data':{'kind':'order','status':'COMPLETED','plan':'ChatGPT Plus','accountMasked':'s***@e***.test','orderNoMasked':'•••• 123456','createdAt':None,'processingAt':None,'completedAt':'2026-10-11T11:00:00Z','updatedAt':None,'requiresVerification':False}})))
+        expect(page.locator('.order-result .order-timeline')).to_be_visible()
+        page.screenshot(path=str(ARTIFACTS/'chatgpt-step3-processing.png'),full_page=True)
+        page.unroute('**/api/orders/query')
+        page.route('**/api/orders/query',lambda route: route.fulfill(status=200,content_type='application/json',body=json.dumps({'ok':True,'data':order_data('COMPLETED',completedAt='2026-10-11T11:01:00Z')})))
         page.get_by_role('button',name='完成安全验证',exact=True).click()
         expect(page.get_by_role('heading',name='充值已完成',exact=True)).to_be_visible()
         wait_events(3)
         assert events==[{'code':'DEMO-TEST-CARD','event':name} for name in ('shown','started','succeeded')],events
         events.clear()
+        page.screenshot(path=str(ARTIFACTS/'chatgpt-step3-completed.png'),full_page=True)
         page.unroute('**/api/orders/query')
-        expect(page.get_by_role('button',name='查询此卡密',exact=True)).to_be_visible()
-        page.get_by_role('button',name='重新开始',exact=True).click()
-        expect(page.get_by_role('button',name='2 验证卡密',exact=True)).to_be_disabled()
         page.unroute('**/api/orders/submit')
         page.unroute('**/api/cards/verify')
         page.unroute('**/api/subscriptions/check')
 
+        navigate_home()
         page.get_by_role('button',name='订单查询',exact=True).click()
         page.get_by_label('兑换卡密',exact=True).fill('DEMO-TEST-CARD')
         query_calls=[0]
@@ -271,7 +284,7 @@ with sync_playwright() as p:
         expect(page.get_by_role('heading',name='等待处理',exact=True)).to_be_visible()
         page.evaluate("window.Stripe=()=>({handleNextAction:async()=>({error:{message:'declined'}})})")
         page.get_by_role('button',name='完成安全验证',exact=True).click()
-        expect(page.get_by_text('安全验证未完成，请稍后在订单查询中重试。',exact=True)).to_be_visible()
+        expect(page.get_by_text('安全验证未完成')).to_be_visible()
         page.evaluate("window.Stripe=()=>({handleNextAction:async()=>({})})")
         page.get_by_role('button',name='完成安全验证',exact=True).click()
         expect(page.get_by_role('heading',name='充值已完成',exact=True)).to_be_visible()

@@ -458,15 +458,19 @@ textarea:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3p
   overflow-wrap: anywhere; font-variant-numeric: tabular-nums;
 }
 
-.notice {
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  margin-top: 16px; padding: 11px 14px; border: 1px solid transparent;
-  border-radius: var(--radius); font-size: var(--fs-small); line-height: 1.6;
+.alert {
+  display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
+  margin-top: 16px; padding: 12px 15px; border: 1px solid var(--alert-border);
+  border-radius: var(--radius); background: var(--alert-bg); color: var(--alert-fg);
+  font-size: var(--fs-small); font-weight: 600; line-height: 1.6; text-align: left;
 }
-.notice.warning { color: var(--warn); background: var(--warn-bg); border-color: var(--warn-border); }
-.notice.success { color: var(--ok); background: var(--ok-bg); border-color: var(--ok-border); }
-.notice > svg { width: 15px; height: 15px; }
-.notice .text-button { margin-left: auto; }
+.alert > svg { flex-shrink: 0; width: 17px; height: 17px; }
+.alert .alert-text { min-width: 0; flex: 1 1 12ch; }
+.alert .text-button { margin-left: auto; color: inherit; font-weight: 700; }
+.alert-link { color: inherit; font-weight: 800; text-decoration: underline; text-underline-offset: 3px; }
+.alert--error { --alert-fg: var(--danger); --alert-bg: var(--danger-bg); --alert-border: color-mix(in srgb, var(--danger) 28%, transparent); }
+.alert--info { --alert-fg: var(--brand-ink); --alert-bg: var(--brand-soft); --alert-border: color-mix(in srgb, var(--brand) 30%, transparent); }
+.alert--success { --alert-fg: var(--ok); --alert-bg: var(--ok-bg); --alert-border: var(--ok-border); }
 
 .continue-button { display: flex; width: 100%; margin-top: 14px; }
 
@@ -669,7 +673,7 @@ textarea:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3p
   .faq-list summary { padding: 15px 16px; font-size: 14px; }
   .faq-list .faq-body { padding: 0 16px 18px; }
   .card-reminder { align-items: flex-start; text-align: left; }
-  .notice .text-button { margin-left: 0; }
+  .alert .text-button { margin-left: 0; }
   .page-intro { padding: 32px 0 20px; }
   .intro-icon { display: none; }
 }

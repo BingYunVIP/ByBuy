@@ -183,11 +183,11 @@ function createGate({ limit, queueLimit, waitMs }) {
 
 async function readJson(response) {
   if (!response.headers.get('content-type')?.includes('application/json')) {
-    throw new PublicError(502, 'SERVICE_UNAVAILABLE', '充值服务暂时不可用，请稍后重试。');
+    throw new PublicError(502, 'SERVICE_UNAVAILABLE', '充值服务暂时不可用，请您联系网站客服协助处理。');
   }
   // Bound upstream responses and keep the timeout active while reading the body.
   const reader = response.body?.getReader();
-  if (!reader) throw new PublicError(502, 'SERVICE_RESPONSE', '暂时未取得查询结果，请稍后重试。');
+  if (!reader) throw new PublicError(502, 'SERVICE_RESPONSE', '暂时未取得查询结果，请您联系网站客服协助处理。');
   const chunks = [];
   let length = 0;
   try {
@@ -197,7 +197,7 @@ async function readJson(response) {
       length += value.byteLength;
       if (length > 128 * 1024) {
         await reader.cancel();
-        throw new PublicError(502, 'SERVICE_RESPONSE', '充值服务返回异常，请稍后重试。');
+        throw new PublicError(502, 'SERVICE_RESPONSE', '充值服务返回异常，请您联系网站客服协助处理。');
       }
       chunks.push(value);
     }
@@ -206,7 +206,7 @@ async function readJson(response) {
     return body;
   } catch (error) {
     if (error instanceof PublicError || error.name === 'AbortError' || error.name === 'TimeoutError') throw error;
-    throw new PublicError(502, 'SERVICE_RESPONSE', '充值服务返回异常，请稍后重试。');
+    throw new PublicError(502, 'SERVICE_RESPONSE', '充值服务返回异常，请您联系网站客服协助处理。');
   } finally {
     reader.releaseLock();
   }
@@ -264,7 +264,7 @@ export function createUpstream({
     if (response.status >= 500 || response.status === 401 || response.status === 403) {
       await response.body?.cancel();
       trace(action, targetIndex, { status: response.status, outcome: 'UNAVAILABLE', durationMs: Math.round(performance.now() - started) });
-      throw new PublicError(502, 'SERVICE_UNAVAILABLE', '充值服务暂时不可用，请稍后重试。');
+      throw new PublicError(502, 'SERVICE_UNAVAILABLE', '充值服务暂时不可用，请您联系网站客服协助处理。');
     }
     if (bestEffort && response.ok) {
       await response.body?.cancel();
@@ -287,10 +287,10 @@ export function createUpstream({
       throw new PublicError(400, 'SESSION_REJECTED', 'Session 已失效或格式不受支持，请重新获取后再试。');
     }
     if (!response.ok || body.code !== 'OK') {
-      throw new PublicError(502, 'SERVICE_REJECTED', '暂时无法获取结果，请检查卡密或稍后重试。');
+      throw new PublicError(502, 'SERVICE_REJECTED', '暂时无法获取结果，请您联系网站客服协助处理。');
     }
     if (!body.data || typeof body.data !== 'object' || Array.isArray(body.data)) {
-      throw new PublicError(502, 'SERVICE_RESPONSE', '充值服务返回异常，请稍后重试。');
+      throw new PublicError(502, 'SERVICE_RESPONSE', '充值服务返回异常，请您联系网站客服协助处理。');
     }
     return body.data;
   }
@@ -300,7 +300,7 @@ export function createUpstream({
     if (error.name === 'TimeoutError' || error.name === 'AbortError') {
       return new PublicError(504, 'SERVICE_TIMEOUT', '等待结果超时，请稍后重新查询。');
     }
-    return new PublicError(502, 'SERVICE_UNAVAILABLE', '暂时无法连接充值服务，请稍后重试。');
+    return new PublicError(502, 'SERVICE_UNAVAILABLE', '暂时无法连接充值服务，请您联系网站客服协助处理。');
   }
 
   async function request(path, payload, action, options) {
@@ -417,7 +417,7 @@ export function createUpstream({
             }
           } catch { /* reconciliation is best effort */ }
         }
-        throw new PublicError(502, 'SUBMISSION_UNKNOWN', '提交结果暂时无法确认，请使用原卡密查询订单，暂不要重复提交。', true);
+        throw new PublicError(502, 'SUBMISSION_UNKNOWN', '提交结果暂时无法确认，请勿重复提交，请您联系网站客服协助处理。', true);
       } finally {
         gate.release();
       }

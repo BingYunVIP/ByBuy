@@ -23,10 +23,10 @@
   max-width: 100%;
   margin: 24px auto 0;
   padding: 12px 22px;
-  border: 1px solid var(--warn-border);
+  border: 1px solid color-mix(in srgb, var(--brand) 30%, transparent);
   border-radius: 999px;
-  background: var(--warn-bg);
-  color: var(--warn);
+  background: var(--brand-soft);
+  color: var(--brand-ink);
   font-size: 14px;
   font-weight: 650;
   line-height: 1.4;

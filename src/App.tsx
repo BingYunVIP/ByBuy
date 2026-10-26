@@ -1,14 +1,17 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import {
-  Ban, Check, ChevronDown, CircleCheck, CircleX, Clock3, Info,
-  Languages, LoaderCircle, LockKeyhole, Moon, Search, ShieldCheck, Sun,
+  Ban, ChevronDown, Clock3, Info,
+  Languages, LoaderCircle, Moon, Search, ShieldCheck, Sun,
   TriangleAlert,
 } from 'lucide-react';
 import CardField from './CardField';
 import { reportVerification, requestCard, runVerification } from './api';
 import type { OrderResult } from './api';
-import { errorKey, showDate, useLocale } from './locale';
+import Alert from './Alert';
+import { SUPPORT } from './links';
+import { errorKey, useLocale } from './locale';
 import type { CopyKey } from './locale';
+import OrderStatusCard from './OrderStatusCard';
 import ProductSwitch from './ProductSwitch';
 import type { ProductPage } from './ProductSwitch';
 import { heroServiceChips, ServiceChips } from './service-chips';
@@ -25,7 +28,6 @@ const TeamRedeem = lazy(() => import('./TeamRedeem'));
 const ORDER_POLL_MS = 5_000;
 
 /* 顶部导航的外链。SHOP 是卡密购买入口，与冰云首页「冰云商店」指向同一站点。 */
-const SUPPORT = 'https://qm.qq.com/q/6fuAq8mBwW';
 const SHOP = 'https://shop.bingyun.vip';
 const EMAIL = 'support@bingyun.vip';
 /* 外链直接指向 ChatGPT 这个 App 的全球价格对比页，而不是站点首页。
@@ -156,33 +158,8 @@ function NoticeBoard() {
 }
 
 
-const orderStatus: Record<OrderResult['status'], CopyKey> = {
-  COMPLETED: 'completed', PROCESSING: 'processing', PENDING: 'queued', FAILED: 'failed',
-  CANCELLED: 'cancelled', PLAN_MISMATCH: 'failed', SUSPICIOUS: 'needsHelp', REQUIRES_NEW_SESSION: 'needsHelp', UNKNOWN: 'unknown',
-};
-
-/* 订单状态的语义分组：决定标题卡、时间轴用哪套配色。 */
-function orderTone(status: OrderResult['status']) {
-  if (status === 'COMPLETED') return 'ok';
-  if (status === 'PROCESSING' || status === 'PENDING') return 'progress';
-  if (status === 'UNKNOWN') return 'muted';
-  return 'bad';
-}
-
-/* 时间轴节点名。locale.tsx 里没有对应文案键，而那个文件不该被这次改动碰，
-   所以就地按语言定义两份，避免往共用文案表里塞东西。 */
-const TIMELINE_ZH = { placed: '提交订单', processing: '开始处理', done: '充值完成' };
-const TIMELINE_EN = { placed: 'Order placed', processing: 'Processing', done: 'Completed' };
-
-/* 卡密只显示头尾，中间打码 —— 和页面里其它地方一样不暴露完整凭证。 */
-function maskCode(value: string) {
-  const parts = value.trim().split('-');
-  if (parts.length < 3) return value;
-  return `${parts[0]}-${parts[1]}-••••-${parts[parts.length - 1]}`;
-}
-
 function OrderView({ initialCode }: { initialCode: string }) {
-  const { t, lang } = useLocale();
+  const { t } = useLocale();
   const { state } = useServiceStatus();
   const [code, setCode] = useState(initialCode);
   const [result, setResult] = useState<OrderResult | null>(null);
@@ -244,17 +221,6 @@ function OrderView({ initialCode }: { initialCode: string }) {
     return () => window.clearTimeout(timer);
   }, [result]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const tone = result ? orderTone(result.status) : 'muted';
-  const StatusIcon = tone === 'ok' ? CircleCheck : tone === 'progress' ? LoaderCircle : tone === 'muted' ? Clock3 : CircleX;
-
-  const timeline = result ? [
-    { key: 'placed', label: (lang === 'zh' ? TIMELINE_ZH : TIMELINE_EN).placed, at: result.createdAt },
-    { key: 'processing', label: (lang === 'zh' ? TIMELINE_ZH : TIMELINE_EN).processing, at: result.processingAt },
-    { key: 'done', label: (lang === 'zh' ? TIMELINE_ZH : TIMELINE_EN).done, at: result.completedAt },
-  ] : [];
-  /* 走到第几个节点 —— 以最后一个有时间的节点为准，缺时间戳的节点不算走到。 */
-  const reached = timeline.reduce((count, item, index) => (item.at ? index + 1 : count), 0);
-
   return <>
     <section className="page-intro bb-rise">
       <h1>{t('orderTitle')}</h1>
@@ -265,43 +231,13 @@ function OrderView({ initialCode }: { initialCode: string }) {
     <section className={`flow-card order-card bb-rise${locked ? ' flow-card--locked' : ''}`} style={{ animationDelay: '80ms' }} aria-disabled={locked || undefined}>
       <form onSubmit={event => { event.preventDefault(); void query(); }} aria-busy={pending} inert={locked || undefined}>
         <CardField value={code} onChange={value => { setCode(value); setResult(null); setError(null); setVerificationError(null); }} disabled={pending || verificationBusy || locked} />
-        {error ? <p className="notice bb-rise warning" role="alert">{t(error)}</p> : null}
+        {error ? <Alert tone="error">{t(error)}</Alert> : null}
         <button className="primary-button" disabled={pending || verificationBusy || locked}>{pending ? <LoaderCircle className="spinner" size={16} /> : <Search size={16} />}{t(pending ? 'querying' : result ? 'refresh' : 'query')}</button>
       </form>
 
       {pending ? <div className="result-pending" role="status" aria-label={t('querying')}>
         <span className="skeleton-bar" /><span className="skeleton-bar" />
-      </div> : result ? <div className={`order-result order-result--${tone} bb-rise`} aria-live="polite">
-        <div className="order-headline">
-          <span className="order-mark"><StatusIcon size={22} className={tone === 'progress' ? 'spinner' : undefined} aria-hidden="true" /></span>
-          <div>
-            <h2>{t(orderStatus[result.status])}</h2>
-            <p>{t('plan')} · <strong>{result.plan}</strong></p>
-          </div>
-        </div>
-
-        <dl className="order-facts">
-          <div><dt>{t('account')}</dt><dd>{result.accountMasked ?? '—'}</dd></div>
-          <div><dt>{t('orderNo')}</dt><dd>{result.orderNoMasked ?? '—'}</dd></div>
-          <div><dt>{t('card')}</dt><dd>{maskCode(code)}</dd></div>
-        </dl>
-
-        {reached > 0 ? <ol className="order-timeline">
-          {timeline.map((item, index) => (
-            <li key={item.key} className={index < reached - 1 ? 'done' : index === reached - 1 ? 'current' : 'pending'}>
-              <span className="tl-dot">{index < reached ? <Check size={12} aria-hidden="true" /> : null}</span>
-              <span className="tl-label">{item.label}</span>
-              <time className="tl-time">{showDate(item.at, lang)}</time>
-            </li>
-          ))}
-        </ol> : null}
-
-        {result.verification ? <div className="notice bb-rise warning" role="alert">
-          <span>{t('completeVerification')}</span>
-          <button className="text-button" type="button" disabled={verificationBusy} onClick={() => void verifyOrder()}>{verificationBusy ? <LoaderCircle className="spinner" size={15} /> : <LockKeyhole size={15} />}{t(verificationBusy ? 'verifyingPayment' : 'completeVerification')}</button>
-        </div> : result.requiresVerification ? <p className="notice bb-rise warning">{t('verificationUnavailable')}</p> : null}
-        {verificationError ? <p className="notice bb-rise warning" role="alert">{t(verificationError)}</p> : null}
-      </div> : null}
+      </div> : result ? <OrderStatusCard result={result} code={code} verificationBusy={verificationBusy} verificationError={verificationError} onVerify={() => void verifyOrder()} /> : null}
     </section>
   </>;
 }

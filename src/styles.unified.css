@@ -212,7 +212,7 @@
 .product-page .primary-button { background: #58affa; color: #000; }
 .product-page .primary-button:hover { background: #7cc4ff; }
 .product-page .secondary-button { background: #f1f5f9; color: #000; }
-.product-page .notice { border-width: 2px; }
+.product-page .alert { border-width: 2px; }
 
 .product-page .page-intro {
   max-width: none;
@@ -240,7 +240,6 @@
 .product-page .flow-card textarea { height: clamp(180px, 30dvh, 360px); max-height: none; }
 .product-page .form-bottom { margin-top: clamp(16px, 2.2dvh, 28px); }
 .product-page .redeem-tab { min-height: clamp(66px, 8dvh, 84px); }
-.product-page .panel-heading { padding-bottom: clamp(21px, 2.6dvh, 32px); }
 .product-page .form-fields { gap: clamp(16px, 2dvh, 24px); margin-top: clamp(22px, 3dvh, 36px); }
 .product-page .neo-input-wrap { min-height: clamp(54px, 6.4dvh, 68px); }
 .product-page .redeem-submit { min-height: clamp(56px, 7dvh, 72px); margin-top: clamp(22px, 3.2dvh, 40px); }

@@ -231,7 +231,7 @@ export function createApi({ upstream = createUpstream(), teamRedeem = createTeam
       appLog.error('ERROR', 'UNHANDLED_ERROR', { requestId: res.locals.requestId, name: error?.name ?? 'Error', code: error?.code ?? 'UNKNOWN' });
       if (error.type === 'entity.too.large') safeError = new PublicError(413, 'INVALID_INPUT', '输入内容过长，请仅提交本次操作需要的资料。');
       else if (error.type === 'entity.parse.failed') safeError = new PublicError(400, 'INVALID_INPUT', '请求格式不正确，请刷新页面重试。');
-      else safeError = new PublicError(500, 'INTERNAL_ERROR', '服务暂时不可用，请稍后重试。');
+      else safeError = new PublicError(500, 'INTERNAL_ERROR', '服务暂时不可用，请您联系网站客服协助处理。');
     }
     const logFields = { requestId: res.locals.requestId, code: safeError.code, status: safeError.status };
     if (safeError.status >= 500) appLog.error('ERROR', 'PUBLIC_ERROR', logFields);
