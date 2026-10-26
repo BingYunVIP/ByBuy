@@ -1,3 +1,4 @@
+import { maskEmail } from './logger.mjs';
 import { PublicError } from './upstream.mjs';
 
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
@@ -167,6 +168,12 @@ export function createTeamRedeem({ origin = process.env.Team_Web, timeoutMs = po
     async ready(input) {
       const data = await request('api/cdk/redeem/ready-sub', { method: 'POST', body: readReady(input) });
       const account = data.account;
+      /* 这张卡之前已经用邮箱邀请兑换过：上游会回放当初的结果（success + 邀请已发送，但没有账号）。
+         这不是故障，要明确告诉用户卡密已使用、邀请邮件已发出，而不是让人以为没用过。 */
+      if (data.status === 'success' && !account && typeof data.email === 'string') {
+        const masked = maskEmail(data.email.trim());
+        throw new PublicError(409, 'TEAM_ALREADY_REDEEMED', `该卡密已经兑换过：团队邀请已发送${masked ? `到 ${masked}` : ''}，请前往邮箱查收邀请邮件，无需再次兑换。`);
+      }
       if (data.status !== 'success' || !account || typeof account !== 'object' || Array.isArray(account)) {
         throw new PublicError(502, 'TEAM_RESPONSE', '现成账号结果暂时无法确认，请稍后查询。', true);
       }

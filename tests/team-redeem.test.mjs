@@ -52,6 +52,17 @@ test('Team adapter rejects unsafe destinations, malformed inputs and non-success
     const ready = createTeamRedeem({ origin, fetchImpl: async () => json({ status: 'success', account: { email: 'a@example.com' } }) });
     await assert.rejects(ready.ready({ cdk: 'TEAM-123456', request_id: requestId }), error => error.status === 502 && error.canQuery);
   });
+  await t.test('a card already used for an invite is reported as used, not as an outage', async () => {
+    const replay = createTeamRedeem({ origin, fetchImpl: async () => json({ status: 'success', msg: '邀请已发送，请前往邮箱接受工作区邀请。', email: 'someone.real@example.com', operation_id: 'op-1' }) });
+    await assert.rejects(replay.ready({ cdk: 'TEAM-123456', request_id: requestId }), error => {
+      assert.equal(error.status, 409);
+      assert.equal(error.code, 'TEAM_ALREADY_REDEEMED');
+      assert.equal(error.canQuery, false);
+      assert.match(error.message, /已经兑换过.*s\*\*\*@e\*\*\*\.com.*查收/);
+      assert.equal(error.message.includes('someone.real'), false, 'full email must not reach the browser');
+      return true;
+    });
+  });
   await t.test('timeouts, network failures, busy and malformed replies are safe and never retried', async () => {
     const cases = [
       ['timeout', () => { throw new DOMException('private timeout detail', 'TimeoutError'); }, 504, 'TEAM_TIMEOUT'],
