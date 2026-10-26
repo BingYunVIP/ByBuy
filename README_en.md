@@ -62,7 +62,7 @@ Production configuration lives in `.env`, excluded from version control (permiss
 | `NO_PROXY` | Optional; hosts that bypass the proxy | unset |
 | `UPSTREAM_TIMEOUT_MS` | Remote request timeout in milliseconds | `25000` |
 | `Team_Web` | HTTPS origin for the Team redemption proxy | unset (Team redemption shows as unavailable) |
-| `TEAM_REDEEM_TIMEOUT_MS` | Team request timeout in milliseconds | `15000` |
+| `TEAM_REDEEM_TIMEOUT_MS` | Team request timeout in milliseconds; the browser waits at most 30 s, so keep it under 30000 | `15000` |
 | `LOG_LEVEL` | `debug` / `info` / `warn` / `error` / `silent` | `info` |
 | `LOG_SALT` | Salt for card fingerprints. Set it to keep one card's log lines linkable across restarts; empty means a new random salt on every start | empty |
 | `SERVICE_DIAGNOSTICS` | Whether to log additional diagnostic metadata | `0` |

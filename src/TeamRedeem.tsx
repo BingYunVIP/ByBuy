@@ -42,6 +42,9 @@ async function requestId(mode: TeamMode, cdk: string, email = '') {
   } catch { throw new Error('浏览器无法保存本次兑换标识，请允许当前网站的会话存储后重试。'); }
 }
 
+/* 兑换请求要比后端对上游的超时（默认 15 秒）更久，否则浏览器先放弃，成功的结果会被吞掉。 */
+const REDEEM_TIMEOUT_MS = 30_000;
+
 async function fetchJson<T>(path: string, init?: RequestInit, timeoutMs = 10_000): Promise<T> {
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), timeoutMs);
@@ -125,9 +128,9 @@ export default function TeamRedeem({ onNavigateProduct }: TeamRedeemProps) {
     try {
       const id = await requestId(mode, code, address);
       if (mode === 'invite') {
-        await fetchJson('/api/team/invite', { method: 'POST', body: JSON.stringify({ cdk: code, email: address, request_id: id }) });
+        await fetchJson('/api/team/invite', { method: 'POST', body: JSON.stringify({ cdk: code, email: address, request_id: id }) }, REDEEM_TIMEOUT_MS);
       } else {
-        const data = await fetchJson<{ status: string; account: Account }>('/api/team/ready', { method: 'POST', body: JSON.stringify({ cdk: code, request_id: id }) });
+        const data = await fetchJson<{ status: string; account: Account }>('/api/team/ready', { method: 'POST', body: JSON.stringify({ cdk: code, request_id: id }) }, REDEEM_TIMEOUT_MS);
         if (data.status !== 'success' || !data.account?.email || !data.account.password) throw new Error('现成账号结果暂时无法确认，请稍后查询。');
         setAccount(data.account);
       }

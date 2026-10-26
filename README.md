@@ -62,7 +62,7 @@ chmod +x ByBuy.sh
 | `NO_PROXY` | 可选；不经过代理的主机列表 | 未设置 |
 | `UPSTREAM_TIMEOUT_MS` | 远程请求超时，单位毫秒 | `25000` |
 | `Team_Web` | Team 兑换公开接口的 HTTPS Origin（服务端代理） | 未设置（Team 兑换显示「暂未开放」） |
-| `TEAM_REDEEM_TIMEOUT_MS` | Team 接口超时，单位毫秒 | `15000` |
+| `TEAM_REDEEM_TIMEOUT_MS` | Team 接口超时，单位毫秒；浏览器最多等 30 秒，请保持小于 30000 | `15000` |
 | `LOG_LEVEL` | `debug` / `info` / `warn` / `error` / `silent` | `info` |
 | `LOG_SALT` | 卡密指纹的盐。固定后，重启前后同一张卡的日志仍可关联；留空则每次启动随机生成 | 留空 |
 | `SERVICE_DIAGNOSTICS` | 是否记录额外诊断元数据 | `0` |
